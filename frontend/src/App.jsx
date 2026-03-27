@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
+const orderStatuses = [
+  'pendente',
+  'comprado',
+  'aguardando entrega',
+  'entregue',
+  'cancelado'
+];
 
 const emptyUserForm = {
   id: null,
@@ -38,6 +45,14 @@ function formatCurrencyValue(value) {
   return numericValue.toFixed(2);
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toLocaleString('pt-BR');
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(tokenStorageKey) || '');
   const [currentUser, setCurrentUser] = useState(null);
@@ -53,6 +68,16 @@ function App() {
   const [requestMessage, setRequestMessage] = useState('');
   const [requestMessageType, setRequestMessageType] = useState('success');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isLoadingSelectedOrder, setIsLoadingSelectedOrder] = useState(false);
+  const [selectedOrderError, setSelectedOrderError] = useState('');
+  const [orderActionMessage, setOrderActionMessage] = useState('');
+  const [isSavingSelectedOrder, setIsSavingSelectedOrder] = useState(false);
+  const [isDeletingSelectedOrder, setIsDeletingSelectedOrder] = useState(false);
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState('');
@@ -105,6 +130,15 @@ function App() {
   }, [token]);
 
   useEffect(() => {
+    if (!currentUser) {
+      setOrders([]);
+      return;
+    }
+
+    loadOrders(token, ordersSearch);
+  }, [currentUser, token, ordersSearch]);
+
+  useEffect(() => {
     if (currentUser?.role === 'admin') {
       loadUsers(token);
     } else {
@@ -151,6 +185,117 @@ function App() {
     } finally {
       setIsLoadingUsers(false);
     }
+  }
+
+  async function loadOrders(currentToken, search = '') {
+    setIsLoadingOrders(true);
+    setOrdersError('');
+
+    try {
+      const query = new URLSearchParams();
+
+      if (search.trim()) {
+        query.set('search', search.trim());
+      }
+
+      const response = await fetch(`${apiBaseUrl}/orders?${query.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${currentToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Nao foi possivel carregar as requisicoes.');
+      }
+
+      const data = await response.json();
+      setOrders(data.orders);
+    } catch (error) {
+      setOrdersError(error.message);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  }
+
+  async function loadOrderDetails(orderId) {
+    setIsLoadingSelectedOrder(true);
+    setSelectedOrderError('');
+    setOrderActionMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders/${orderId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Nao foi possivel carregar o pedido.');
+      }
+
+      setSelectedOrder(data.order);
+    } catch (error) {
+      setSelectedOrderError(error.message);
+    } finally {
+      setIsLoadingSelectedOrder(false);
+    }
+  }
+
+  function updateSelectedOrderField(field, value) {
+    setOrderActionMessage('');
+    setSelectedOrder((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function updateSelectedOrderItem(itemId, field, value) {
+    setOrderActionMessage('');
+    setSelectedOrder((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const items = current.items.map((item) => {
+        if (item.id !== itemId) {
+          return item;
+        }
+
+        const updatedItem = {
+          ...item,
+          [field]: value
+        };
+
+        if (field === 'productValue') {
+          updatedItem.saleValue = Number(formatCurrencyValue(Number(value || 0) * 1.7));
+        }
+
+        return updatedItem;
+      });
+
+      const total = items.reduce(
+        (sum, item) => sum + Number(item.passedValue || 0),
+        0
+      );
+
+      return {
+        ...current,
+        items,
+        total: Number(formatCurrencyValue(total))
+      };
+    });
+  }
+
+  function openOrderActions(orderId) {
+    setActiveTab('panel');
+    loadOrderDetails(orderId);
+  }
+
+  function closeOrderActions() {
+    setSelectedOrder(null);
+    setSelectedOrderError('');
+    setOrderActionMessage('');
   }
 
   function clearSession() {
@@ -254,6 +399,10 @@ function App() {
       return;
     }
 
+    if (nextTab !== 'panel') {
+      closeOrderActions();
+    }
+
     setActiveTab(nextTab);
   }
 
@@ -297,6 +446,7 @@ function App() {
     }
 
     clearSession();
+    closeOrderActions();
     setRequestForm(createEmptyRequestForm());
     setRequestMessage('');
   }
@@ -336,6 +486,8 @@ function App() {
       setRequestForm(createEmptyRequestForm());
       setRequestMessageType('success');
       setRequestMessage('Solicitacao enviada com sucesso.');
+      setActiveTab('panel');
+      await loadOrders(token, ordersSearch);
     } catch (error) {
       setRequestMessageType('error');
       setRequestMessage(error.message);
@@ -426,6 +578,88 @@ function App() {
     }
   }
 
+  async function handleSaveSelectedOrder(event) {
+    event.preventDefault();
+
+    if (!selectedOrder) {
+      return;
+    }
+
+    setIsSavingSelectedOrder(true);
+    setOrderActionMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders/${selectedOrder.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: selectedOrder.status,
+          estimatedDelivery: selectedOrder.estimatedDelivery || '',
+          comments: selectedOrder.comments || '',
+          items: selectedOrder.items.map((item) => ({
+            id: item.id,
+            productValue: Number(item.productValue || 0),
+            passedValue: Number(item.passedValue || 0)
+          }))
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Nao foi possivel salvar o pedido.');
+      }
+
+      setSelectedOrder(data.order);
+      setOrderActionMessage('Pedido atualizado com sucesso.');
+      await loadOrders(token, ordersSearch);
+    } catch (error) {
+      setOrderActionMessage(error.message);
+    } finally {
+      setIsSavingSelectedOrder(false);
+    }
+  }
+
+  async function handleDeleteSelectedOrder() {
+    if (!selectedOrder) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Deseja excluir o pedido #${selectedOrder.id}? Essa acao nao pode ser desfeita.`
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeletingSelectedOrder(true);
+    setOrderActionMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders/${selectedOrder.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Nao foi possivel excluir o pedido.');
+      }
+
+      closeOrderActions();
+      await loadOrders(token, ordersSearch);
+    } catch (error) {
+      setOrderActionMessage(error.message);
+    } finally {
+      setIsDeletingSelectedOrder(false);
+    }
+  }
+
   function resetUserForm() {
     setFormMessage('');
     setUserForm(emptyUserForm);
@@ -494,38 +728,43 @@ function App() {
 
   return (
     <main className="page page--dashboard">
-      <section className="panel topbar">
-        <div>
+      <section className="panel topbar topbar--integrated">
+        <div className="topbar__brand">
           <p className="eyebrow">Sistema de Compras</p>
-          <h1>Painel de solicitacoes</h1>
-          <p className="description">
-            Bem-vindo, <strong>{currentUser.name}</strong>. Perfil atual:{' '}
-            <strong>{currentUser.role}</strong>.
-          </p>
+          <h1>Compras</h1>
         </div>
 
-        <button type="button" className="button button--ghost" onClick={handleLogout}>
-          Sair
-        </button>
-      </section>
+        <div className="topbar__right">
+          <nav className="tabbar">
+            <button
+              type="button"
+              className={`tab-button ${activeTab === 'request' ? 'tab-button--active' : ''}`}
+              onClick={() => changeTab('request')}
+            >
+              Nova solicitacao
+            </button>
+            <button
+              type="button"
+              className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
+              onClick={() => changeTab('panel')}
+            >
+              Painel de compras
+            </button>
+            {currentUser.role === 'admin' ? (
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
+                onClick={() => changeTab('users')}
+              >
+                Usuarios
+              </button>
+            ) : null}
+          </nav>
 
-      <section className="panel tabbar">
-        <button
-          type="button"
-          className={`tab-button ${activeTab === 'request' ? 'tab-button--active' : ''}`}
-          onClick={() => changeTab('request')}
-        >
-          Nova solicitacao
-        </button>
-        {currentUser.role === 'admin' ? (
-          <button
-            type="button"
-            className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
-            onClick={() => changeTab('users')}
-          >
-            Usuarios
+          <button type="button" className="button button--ghost" onClick={handleLogout}>
+            Sair
           </button>
-        ) : null}
+        </div>
       </section>
 
       {activeTab === 'request' ? (
@@ -539,7 +778,7 @@ function App() {
             </div>
 
             <form className="request-form" onSubmit={handleRequestSubmit}>
-              <div className="form-grid">
+              <div className="form-grid form-grid--request-line">
                 <label>
                   <span>Nome do pedido</span>
                   <input
@@ -557,32 +796,28 @@ function App() {
                     onChange={(event) => updateRequestField('urgency', event.target.value)}
                   >
                     <option value="normal">Normal</option>
-                      <option value="priority">Prioridade</option>
+                    <option value="priority">Prioridade</option>
                   </select>
                 </label>
-
-              </div>
-
-              <div className="form-grid form-grid--os">
-
                 <label>
                   <span>OS relacionada</span>
                   <input
                     type="text"
                     inputMode="numeric"
+                    maxLength={5}
                     value={requestForm.relatedOs}
                     onChange={(event) =>
                       updateRequestField(
                         'relatedOs',
-                        event.target.value.replace(/\D+/g, '')
+                        event.target.value.replace(/\D+/g, '').slice(0, 5)
                       )
                     }
-                    placeholder="Somente numeros"
+                    placeholder="Numero da OS"
                     disabled={requestForm.withoutOs}
                   />
                 </label>
 
-                <label className="checkbox-field">
+                <label className="checkbox-field checkbox-field--inline-row">
                   <input
                     type="checkbox"
                     checked={requestForm.withoutOs}
@@ -710,6 +945,286 @@ function App() {
                 {isSubmittingRequest ? 'Enviando...' : 'Enviar solicitacao'}
               </button>
             </form>
+          </article>
+        </section>
+      ) : null}
+
+      {activeTab === 'panel' ? (
+        <section className="request-layout">
+          <article className="panel">
+            {selectedOrder ? (
+              <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">Pedido #{selectedOrder.id}</p>
+                    <h2>{selectedOrder.requestName}</h2>
+                  </div>
+
+                  <div className="order-actions__top-buttons">
+                    <button
+                      type="submit"
+                      className="button"
+                      disabled={isSavingSelectedOrder}
+                    >
+                      {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={closeOrderActions}
+                    >
+                      Voltar
+                    </button>
+                    {currentUser.role === 'admin' ? (
+                      <button
+                        type="button"
+                        className="button button--danger"
+                        onClick={handleDeleteSelectedOrder}
+                        disabled={isDeletingSelectedOrder}
+                      >
+                        {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {selectedOrderError ? (
+                  <p className="feedback feedback--error">{selectedOrderError}</p>
+                ) : null}
+
+                <section className="order-block">
+                  <div className="section-header">
+                    <div>
+                      <p className="eyebrow">Informacoes gerais</p>
+                    </div>
+                  </div>
+
+                  <div className="order-general-grid">
+                    <label>
+                      <span>Solicitante</span>
+                      <input
+                        type="text"
+                        value={`${selectedOrder.requesterName} (@${selectedOrder.requesterUsername})`}
+                        readOnly
+                      />
+                    </label>
+
+                    <label>
+                      <span>Data da solicitacao</span>
+                      <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
+                    </label>
+
+                    <label>
+                      <span>OS</span>
+                      <input
+                        type="text"
+                        value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
+                        readOnly
+                      />
+                    </label>
+
+                    <label>
+                      <span>Urgencia</span>
+                      <input
+                        type="text"
+                        value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+                        readOnly
+                      />
+                    </label>
+
+                    <label>
+                      <span>Status do pedido</span>
+                      <select
+                        value={selectedOrder.status}
+                        onChange={(event) =>
+                          updateSelectedOrderField('status', event.target.value)
+                        }
+                      >
+                        {orderStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      <span>Previsao de entrega</span>
+                      <input
+                        type="date"
+                        value={selectedOrder.estimatedDelivery || ''}
+                        onChange={(event) =>
+                          updateSelectedOrderField('estimatedDelivery', event.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    <span>Comentarios / Obs</span>
+                    <textarea
+                      value={selectedOrder.comments || ''}
+                      onChange={(event) =>
+                        updateSelectedOrderField('comments', event.target.value)
+                      }
+                      rows={4}
+                    />
+                  </label>
+                </section>
+
+                <section className="order-block">
+                  <div className="section-header">
+                    <div>
+                      <p className="eyebrow">Itens solicitados</p>
+                    </div>
+                  </div>
+
+                  <div className="order-items-table">
+                    <div className="order-items-table__head">
+                      <span>Produto</span>
+                      <span>Qtd</span>
+                      <span>Detalhes</span>
+                      <span>Obs</span>
+                      <span>Valor do produto</span>
+                      <span>Valor da venda</span>
+                      <span>Valor repassado</span>
+                    </div>
+
+                    <div className="order-items-table__body">
+                      {selectedOrder.items.map((item) => (
+                        <article key={item.id} className="order-item-row">
+                          <strong>{item.productName}</strong>
+                          <span>{item.quantity}</span>
+                          <button
+                            type="button"
+                            className="button button--ghost"
+                            onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
+                            disabled={!item.productLink}
+                          >
+                            Abrir link
+                          </button>
+                          <span>{item.notes || '-'}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.productValue}
+                            onChange={(event) =>
+                              updateSelectedOrderItem(item.id, 'productValue', event.target.value)
+                            }
+                          />
+                          <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.passedValue}
+                            onChange={(event) =>
+                              updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
+                            }
+                          />
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="order-total">
+                    <span>Total do pedido</span>
+                    <strong>R$ {formatCurrencyValue(selectedOrder.total)}</strong>
+                  </div>
+                </section>
+
+                <section className="order-block">
+                  <div className="section-header">
+                    <div>
+                      <p className="eyebrow">Historico de alteracoes</p>
+                    </div>
+                  </div>
+
+                  <div className="history-list">
+                    {selectedOrder.history?.length ? (
+                      selectedOrder.history.map((entry) => (
+                        <article key={entry.id} className="history-item">
+                          <div className="history-item__meta">
+                            <strong>{entry.name}</strong>
+                            <span>@{entry.username}</span>
+                            <span>{formatDateTime(entry.createdAt)}</span>
+                          </div>
+                          <p>{entry.description}</p>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="empty-state">Nenhuma alteracao registrada ainda.</p>
+                    )}
+                  </div>
+                </section>
+
+                {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
+              </form>
+            ) : (
+              <>
+                <div className="section-header">
+                  <div>
+                    <p className="eyebrow">Painel de compras</p>
+                    <h2>Lista das requisicoes</h2>
+                  </div>
+                </div>
+
+                <div className="panel-toolbar">
+                  <label className="search-field">
+                    <span>Buscar por ID, descricao ou status</span>
+                    <input
+                      type="text"
+                      value={ordersSearch}
+                      onChange={(event) => setOrdersSearch(event.target.value)}
+                      placeholder="Ex.: 12, compra de insumos, pendente"
+                    />
+                  </label>
+                </div>
+
+                {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
+                {isLoadingOrders ? <p>Carregando requisicoes...</p> : null}
+                {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
+
+                {!isLoadingOrders && !ordersError ? (
+                  <div className="orders-table">
+                    <div className="orders-table__head">
+                      <span>ID</span>
+                      <span>Ultima atualizacao</span>
+                      <span>Descricao</span>
+                      <span>Itens</span>
+                      <span>Urgencia</span>
+                      <span>Status</span>
+                      <span>Acoes</span>
+                    </div>
+
+                    <div className="orders-table__body">
+                      {orders.length === 0 ? (
+                        <p className="empty-state">Nenhuma requisicao encontrada.</p>
+                      ) : (
+                        orders.map((order) => (
+                          <article key={order.id} className="order-row">
+                            <strong>#{order.id}</strong>
+                            <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
+                            <span>{order.requestName || '-'}</span>
+                            <span>{order.itemsCount}</span>
+                            <span>{order.urgency === 'priority' ? 'Prioridade' : 'Normal'}</span>
+                            <span className="status-chip">{order.status}</span>
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => openOrderActions(order.id)}
+                            >
+                              Acoes
+                            </button>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
           </article>
         </section>
       ) : null}

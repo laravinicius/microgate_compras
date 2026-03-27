@@ -1,4 +1,18 @@
-import { createOrder } from '../services/orderService.js';
+import {
+  createOrder,
+  deleteOrder,
+  getOrderById,
+  listOrders,
+  updateOrder
+} from '../services/orderService.js';
+
+const allowedStatuses = [
+  'pendente',
+  'comprado',
+  'aguardando entrega',
+  'entregue',
+  'cancelado'
+];
 
 function toCurrencyNumber(value) {
   const normalizedValue = Number(value);
@@ -10,25 +24,33 @@ function toCurrencyNumber(value) {
   return Number(normalizedValue.toFixed(2));
 }
 
-function validateItems(items) {
+function validateItems(items, allowPartial = false) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'Adicione ao menos um item na solicitacao.';
   }
 
   for (const item of items) {
-    if (!String(item.productName ?? '').trim()) {
+    if (!String(item.productName ?? '').trim() && !allowPartial) {
       return 'Informe o produto em todos os itens.';
     }
 
-    const quantity = Number(item.quantity);
-    const productValue = Number(item.productValue);
+    if (!allowPartial) {
+      const quantity = Number(item.quantity);
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      return 'A quantidade deve ser um numero inteiro maior que zero.';
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return 'A quantidade deve ser um numero inteiro maior que zero.';
+      }
     }
+
+    const productValue = Number(item.productValue);
+    const passedValue = Number(item.passedValue ?? 0);
 
     if (!Number.isFinite(productValue) || productValue < 0) {
       return 'O valor do produto deve ser um numero valido.';
+    }
+
+    if (!Number.isFinite(passedValue) || passedValue < 0) {
+      return 'O valor repassado deve ser um numero valido.';
     }
   }
 
@@ -73,14 +95,20 @@ async function createOrderHandler(request, response, next) {
       return;
     }
 
-    const normalizedItems = items.map((item) => ({
-      productName: String(item.productName ?? '').trim(),
-      productLink: String(item.productLink ?? '').trim(),
-      notes: String(item.notes ?? '').trim(),
-      quantity: Number(item.quantity),
-      productValue: toCurrencyNumber(item.productValue),
-      saleValue: toCurrencyNumber(Number(item.productValue) * 1.7)
-    }));
+    const normalizedItems = items.map((item) => {
+      const productValue = toCurrencyNumber(item.productValue);
+      const saleValue = toCurrencyNumber(Number(item.productValue) * 1.7);
+
+      return {
+        productName: String(item.productName ?? '').trim(),
+        productLink: String(item.productLink ?? '').trim(),
+        notes: String(item.notes ?? '').trim(),
+        quantity: Number(item.quantity),
+        productValue,
+        saleValue,
+        passedValue: toCurrencyNumber(saleValue * Number(item.quantity))
+      };
+    });
 
     const order = await createOrder({
       userId: request.user.id,
@@ -97,4 +125,107 @@ async function createOrderHandler(request, response, next) {
   }
 }
 
-export { createOrderHandler };
+async function listOrdersHandler(request, response, next) {
+  try {
+    const search = String(request.query?.search ?? '').trim();
+    const orders = await listOrders(search);
+
+    response.json({ orders });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getOrderDetailsHandler(request, response, next) {
+  try {
+    const order = await getOrderById(Number(request.params.id));
+
+    if (!order) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    response.json({ order });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateOrderHandler(request, response, next) {
+  try {
+    const orderId = Number(request.params.id);
+    const status = String(request.body?.status ?? '').trim().toLowerCase();
+    const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
+    const comments = String(request.body?.comments ?? '').trim();
+    const items = Array.isArray(request.body?.items) ? request.body.items : [];
+
+    if (!allowedStatuses.includes(status)) {
+      response.status(400).json({
+        error: 'Status invalido.'
+      });
+      return;
+    }
+
+    const itemValidationError = validateItems(items, true);
+
+    if (itemValidationError) {
+      response.status(400).json({
+        error: itemValidationError
+      });
+      return;
+    }
+
+    const normalizedItems = items.map((item) => ({
+      id: Number(item.id),
+      productValue: toCurrencyNumber(item.productValue),
+      saleValue: toCurrencyNumber(Number(item.productValue) * 1.7),
+      passedValue: toCurrencyNumber(item.passedValue)
+    }));
+
+    const order = await updateOrder(orderId, {
+      userId: request.user.id,
+      status,
+      estimatedDelivery: estimatedDelivery || null,
+      comments,
+      items: normalizedItems
+    });
+
+    if (!order) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    response.json({ order });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deleteOrderHandler(request, response, next) {
+  try {
+    const deleted = await deleteOrder(Number(request.params.id));
+
+    if (!deleted) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    response.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export {
+  createOrderHandler,
+  deleteOrderHandler,
+  getOrderDetailsHandler,
+  listOrdersHandler,
+  updateOrderHandler
+};
