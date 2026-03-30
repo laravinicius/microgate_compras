@@ -112,9 +112,9 @@ select option {
 }
 
 .popup {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
   min-width: min(520px, 100%);
   max-width: 680px;
   min-height: 160px;
@@ -513,11 +513,14 @@ input[readonly] {
 }
 
 .panel-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 14px;
   margin-bottom: 18px;
 }
 
 .search-field {
-  max-width: 520px;
+  max-width: none;
 }
 
 .users-list,
@@ -542,6 +545,11 @@ input[readonly] {
 
 .form-grid--values {
   grid-template-columns: 110px 1fr 1fr;
+}
+
+.form-grid--item-details {
+  grid-template-columns: minmax(260px, 1.6fr) 110px 1fr 1fr;
+  align-items: end;
 }
 
 .checkbox-field {
@@ -635,7 +643,7 @@ input[readonly] {
 .orders-table__head,
 .order-row {
   display: grid;
-  grid-template-columns: 90px 220px minmax(260px, 1fr) 90px 110px 120px 120px;
+  grid-template-columns: 90px 200px minmax(180px, 0.9fr) minmax(220px, 1fr) 90px 110px 120px 120px;
   gap: 12px;
   align-items: center;
 }
@@ -698,6 +706,7 @@ input[readonly] {
   .dashboard-grid,
   .form-grid,
   .form-grid--values,
+  .form-grid--item-details,
   .form-grid--request-line,
   .order-general-grid,
   .orders-table__head,

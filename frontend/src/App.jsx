@@ -10,6 +10,8 @@ const orderStatuses = [
   'entregue',
   'cancelado'
 ];
+const panelFilterStatuses = ['pendente', 'comprado', 'aguardando entrega'];
+const historyFilterStatuses = ['entregue', 'cancelado'];
 
 const orderStatusLabels = {
   pending: 'pendente',
@@ -158,7 +160,11 @@ function App() {
   const [requestMessageType, setRequestMessageType] = useState('success');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [orders, setOrders] = useState([]);
-  const [ordersSearch, setOrdersSearch] = useState('');
+  const [ordersFilters, setOrdersFilters] = useState({
+    id: '',
+    status: '',
+    requesterId: ''
+  });
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [ordersError, setOrdersError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -179,6 +185,8 @@ function App() {
   const historicalOrders = orders.filter((order) => isFinishedStatus(order.status));
   const selectedOrderCanEdit = canEditOrder(currentUser, selectedOrder);
   const selectedOrderCanDelete = canDeleteOrder(currentUser);
+  const availableStatusFilters =
+    activeTab === 'history' ? historyFilterStatuses : panelFilterStatuses;
 
   useEffect(() => {
     if (!popup) {
@@ -187,7 +195,7 @@ function App() {
 
     const timeoutId = window.setTimeout(() => {
       setPopup(null);
-    }, 1000);
+    }, 5000);
 
     return () => window.clearTimeout(timeoutId);
   }, [popup]);
@@ -242,11 +250,26 @@ function App() {
       return;
     }
 
-    loadOrders(token, ordersSearch);
-  }, [currentUser, token, ordersSearch]);
+    loadOrders(token, ordersFilters);
+  }, [currentUser, token, ordersFilters]);
 
   useEffect(() => {
-    if (canManageUsers(currentUser)) {
+    if (!ordersFilters.status) {
+      return;
+    }
+
+    if (availableStatusFilters.includes(ordersFilters.status)) {
+      return;
+    }
+
+    setOrdersFilters((current) => ({
+      ...current,
+      status: ''
+    }));
+  }, [activeTab, availableStatusFilters, ordersFilters.status]);
+
+  useEffect(() => {
+    if (currentUser) {
       loadUsers(token);
     } else {
       setUsers([]);
@@ -282,7 +305,7 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar os usuarios.');
+        throw new Error('Nao foi possivel carregar os Usuários.');
       }
 
       const data = await response.json();
@@ -294,15 +317,23 @@ function App() {
     }
   }
 
-  async function loadOrders(currentToken, search = '') {
+  async function loadOrders(currentToken, filters = {}) {
     setIsLoadingOrders(true);
     setOrdersError('');
 
     try {
       const query = new URLSearchParams();
 
-      if (search.trim()) {
-        query.set('search', search.trim());
+      if (filters.id?.trim()) {
+        query.set('id', filters.id.trim());
+      }
+
+      if (filters.status?.trim()) {
+        query.set('status', filters.status.trim());
+      }
+
+      if (filters.requesterId?.trim()) {
+        query.set('requesterId', filters.requesterId.trim());
       }
 
       const response = await fetch(`${apiBaseUrl}/orders?${query.toString()}`, {
@@ -312,7 +343,7 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar as requisicoes.');
+        throw new Error('Nao foi possivel carregar as Requisições.');
       }
 
       const data = await response.json();
@@ -423,7 +454,7 @@ function App() {
     }
 
     return window.confirm(
-      'Existem alteracoes nao salvas nesta solicitacao. Deseja sair mesmo assim?'
+      'Existem alteracoes nao salvas nesta Solicitação. Deseja sair mesmo assim?'
     );
   }
 
@@ -444,6 +475,13 @@ function App() {
   function updateRequestField(field, value) {
     setRequestMessage('');
     setRequestForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function updateOrdersFilter(field, value) {
+    setOrdersFilters((current) => ({
       ...current,
       [field]: value
     }));
@@ -588,18 +626,18 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Nao foi possivel enviar a solicitacao.');
+        throw new Error(data.error || 'Nao foi possivel enviar a Solicitação.');
       }
 
       setRequestForm(createEmptyRequestForm());
       setRequestMessageType('success');
-      setRequestMessage('Solicitacao enviada com sucesso.');
+      setRequestMessage('Solicitação enviada com sucesso.');
       setPopup({
         type: 'success',
-        message: 'Solicitacao enviada com sucesso.'
+        message: 'Solicitação enviada com sucesso.'
       });
       setActiveTab('panel');
-      await loadOrders(token, ordersSearch);
+      await loadOrders(token, ordersFilters);
     } catch (error) {
       setRequestMessageType('error');
       setRequestMessage(error.message);
@@ -700,7 +738,7 @@ function App() {
     if (selectedOrder.estimatedDelivery && isPendingStatus(selectedOrder.status)) {
       setPopup({
         type: 'warning',
-        message: 'Defina um status diferente de pendente ao informar uma previsao de entrega.'
+        message: 'Defina um status diferente de pendente ao informar uma Previsão de entrega.'
       });
       return;
     }
@@ -741,7 +779,7 @@ function App() {
         type: 'success',
         message: 'Alteracoes salvas com sucesso.'
       });
-      await loadOrders(token, ordersSearch);
+      await loadOrders(token, ordersFilters);
 
       if (isFinishedStatus(data.order.status)) {
         setActiveTab('history');
@@ -783,7 +821,7 @@ function App() {
       }
 
       closeOrderActions();
-      await loadOrders(token, ordersSearch);
+      await loadOrders(token, ordersFilters);
     } catch (error) {
       setOrderActionMessage(error.message);
     } finally {
@@ -868,7 +906,6 @@ function App() {
             <img src={microgateLogo} alt="Microgate" className="site-brand__logo" />
             <div className="site-brand__copy">
               <p className="eyebrow">Sistema de Compras</p>
-              <strong>Microgate Compras</strong>
               <span>{currentUser.name}</span>
             </div>
           </div>
@@ -880,7 +917,7 @@ function App() {
                 className={`tab-button tab-button--green ${activeTab === 'request' ? 'tab-button--active' : ''}`}
                 onClick={() => changeTab('request')}
               >
-                Nova solicitacao
+                Nova Solicitação
               </button>
               <button
                 type="button"
@@ -894,7 +931,7 @@ function App() {
                 className={`tab-button ${activeTab === 'history' ? 'tab-button--active' : ''}`}
                 onClick={() => changeTab('history')}
               >
-                Historico
+                Histórico
               </button>
               {canManageUsers(currentUser) ? (
                 <button
@@ -902,7 +939,7 @@ function App() {
                   className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
                   onClick={() => changeTab('users')}
                 >
-                  Usuarios
+                  Usuários
                 </button>
               ) : null}
             </nav>
@@ -919,6 +956,9 @@ function App() {
           <div className="popup-overlay" role="status" aria-live="polite" aria-atomic="true">
             <div className={`popup popup--${popup.type}`}>
               <p>{popup.message}</p>
+              <button type="button" className="button button--ghost" onClick={() => setPopup(null)}>
+                OK
+              </button>
             </div>
           </div>
         ) : null}
@@ -928,11 +968,8 @@ function App() {
             <article className="panel">
               <div className="section-header section-header--page">
                 <div>
-                  <p className="eyebrow">Nova solicitacao</p>
+                  <p className="eyebrow">Nova Solicitação</p>
                   <h1 className="page-title">Preencha os dados do pedido</h1>
-                  <p className="description">
-                    Registre os itens, prioridade e referencia de OS para encaminhar a compra.
-                  </p>
                 </div>
               </div>
 
@@ -949,7 +986,7 @@ function App() {
                 </label>
 
                 <label>
-                  <span>Urgencia</span>
+                  <span>urgência</span>
                   <select
                     value={requestForm.urgency}
                     onChange={(event) => updateRequestField('urgency', event.target.value)}
@@ -995,7 +1032,7 @@ function App() {
                 <div className="items-header">
                   <div>
                     <p className="eyebrow">Itens</p>
-                    <h2>Produtos da solicitacao</h2>
+                    <h2>Produtos da Solicitação</h2>
                   </div>
 
                   <button type="button" className="button button--ghost" onClick={addRequestItem}>
@@ -1043,17 +1080,17 @@ function App() {
                       </label>
                     </div>
 
-                    <label>
-                      <span>Obs</span>
-                      <input
-                        type="text"
-                        value={item.notes}
-                        onChange={(event) => updateRequestItem(index, 'notes', event.target.value)}
-                        placeholder="Detalhes do item"
-                      />
-                    </label>
+                    <div className="form-grid form-grid--item-details">
+                      <label>
+                        <span>Obs</span>
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(event) => updateRequestItem(index, 'notes', event.target.value)}
+                          placeholder="Detalhes do item"
+                        />
+                      </label>
 
-                    <div className="form-grid form-grid--values">
                       <label>
                         <span>Qtd</span>
                         <input
@@ -1101,7 +1138,7 @@ function App() {
                 ) : null}
 
                 <button type="submit" className="button button--green" disabled={isSubmittingRequest}>
-                  {isSubmittingRequest ? 'Enviando...' : 'Enviar solicitacao'}
+                  {isSubmittingRequest ? 'Enviando...' : 'Enviar Solicitação'}
                 </button>
               </form>
             </article>
@@ -1118,7 +1155,7 @@ function App() {
                       <p className="eyebrow">Pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
-                        Acompanhe status, valores e historico desta solicitacao.
+                        Acompanhe status, valores e Histórico desta Solicitação.
                       </p>
                     </div>
 
@@ -1174,7 +1211,7 @@ function App() {
                     </label>
 
                     <label>
-                      <span>Data da solicitacao</span>
+                      <span>Data da Solicitação</span>
                       <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
                     </label>
 
@@ -1188,7 +1225,7 @@ function App() {
                     </label>
 
                     <label>
-                      <span>Urgencia</span>
+                      <span>urgência</span>
                       <input
                         type="text"
                         value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
@@ -1214,7 +1251,7 @@ function App() {
                     </label>
 
                     <label>
-                      <span>Previsao de entrega</span>
+                      <span>Previsão de entrega</span>
                       <input
                         type="date"
                         value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
@@ -1306,7 +1343,7 @@ function App() {
                 <section className="order-block">
                   <div className="section-header">
                     <div>
-                      <p className="eyebrow">Historico de alteracoes</p>
+                      <p className="eyebrow">Histórico de alteracoes</p>
                     </div>
                   </div>
 
@@ -1335,7 +1372,7 @@ function App() {
                   <div className="section-header section-header--page">
                     <div>
                       <p className="eyebrow">Painel de compras</p>
-                      <h1 className="page-title">Lista das requisicoes</h1>
+                      <h1 className="page-title">Lista das Requisições</h1>
                       <p className="description">
                         Consulte pedidos ativos, andamento de compras e movimentacoes recentes.
                       </p>
@@ -1344,30 +1381,61 @@ function App() {
 
                 <div className="panel-toolbar">
                   <label className="search-field">
-                    <span>Buscar por ID, descricao ou status</span>
+                    <span>Filtrar por ID</span>
                     <input
                       type="text"
-                      value={ordersSearch}
-                      onChange={(event) => setOrdersSearch(event.target.value)}
-                      placeholder="Ex.: 12, compra de insumos, pendente"
+                      value={ordersFilters.id}
+                      onChange={(event) => updateOrdersFilter('id', event.target.value)}
+                      placeholder="Ex.: 12"
                     />
+                  </label>
+
+                  <label className="search-field">
+                    <span>Filtrar por status</span>
+                    <select
+                      value={ordersFilters.status}
+                      onChange={(event) => updateOrdersFilter('status', event.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {availableStatusFilters.map((status) => (
+                        <option key={status} value={status}>
+                          {formatOrderStatus(status)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="search-field">
+                    <span>Filtrar por solicitante</span>
+                    <select
+                      value={ordersFilters.requesterId}
+                      onChange={(event) => updateOrdersFilter('requesterId', event.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name} (@{user.username})
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
 
                 {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
-                {isLoadingOrders ? <p>Carregando requisicoes...</p> : null}
+                {isLoadingOrders ? <p>Carregando Requisições...</p> : null}
                 {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
 
                 {!isLoadingOrders && !ordersError ? (
                   <div className="orders-table">
                     <div className="orders-table__head">
                       <span>ID</span>
-                      <span>Ultima atualizacao</span>
-                      <span>Descricao</span>
+                      <span>Última atualização</span>
+                      <span>Solicitante</span>
+                      <span>Descrição</span>
                       <span>Itens</span>
-                      <span>Urgencia</span>
+                      <span>urgência</span>
                       <span>Status</span>
-                      <span>Acoes</span>
+                      <span>Ações</span>
                     </div>
 
                     <div className="orders-table__body">
@@ -1378,6 +1446,7 @@ function App() {
                           <article key={order.id} className="order-row">
                             <strong>#{order.id}</strong>
                             <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
+                            <span>{order.requesterName || order.requesterUsername || '-'}</span>
                             <span>{order.requestName || '-'}</span>
                             <span>{order.itemsCount}</span>
                             <span
@@ -1393,7 +1462,7 @@ function App() {
                               className="button button--blue"
                               onClick={() => openOrderActions(order.id)}
                             >
-                              Acoes
+                              Ações
                             </button>
                           </article>
                         ))
@@ -1414,10 +1483,10 @@ function App() {
                 <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
                   <div className="section-header section-header--page">
                     <div>
-                      <p className="eyebrow">Historico do pedido #{selectedOrder.id}</p>
+                      <p className="eyebrow">Histórico do pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
-                        Requisicoes entregues sao consideradas finalizadas e ficam arquivadas aqui.
+                        Requisições entregues sao consideradas finalizadas e ficam arquivadas aqui.
                       </p>
                     </div>
 
@@ -1473,7 +1542,7 @@ function App() {
                       </label>
 
                       <label>
-                        <span>Data da solicitacao</span>
+                        <span>Data da Solicitação</span>
                         <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
                       </label>
 
@@ -1487,7 +1556,7 @@ function App() {
                       </label>
 
                       <label>
-                        <span>Urgencia</span>
+                        <span>urgência</span>
                         <input
                           type="text"
                           value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
@@ -1513,7 +1582,7 @@ function App() {
                       </label>
 
                       <label>
-                        <span>Previsao de entrega</span>
+                        <span>Previsão de entrega</span>
                       <input
                         type="date"
                         value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
@@ -1605,7 +1674,7 @@ function App() {
                   <section className="order-block">
                     <div className="section-header">
                       <div>
-                        <p className="eyebrow">Historico de alteracoes</p>
+                        <p className="eyebrow">Histórico de alteracoes</p>
                       </div>
                     </div>
 
@@ -1633,8 +1702,8 @@ function App() {
                 <>
                   <div className="section-header section-header--page">
                     <div>
-                      <p className="eyebrow">Historico</p>
-                      <h1 className="page-title">Requisicoes finalizadas</h1>
+                      <p className="eyebrow">Histórico</p>
+                      <h1 className="page-title">Requisições finalizadas</h1>
                       <p className="description">
                         Aqui ficam os pedidos entregues, considerados concluidos.
                       </p>
@@ -1643,30 +1712,61 @@ function App() {
 
                   <div className="panel-toolbar">
                     <label className="search-field">
-                      <span>Buscar por ID, descricao ou status</span>
+                      <span>Filtrar por ID</span>
                       <input
                         type="text"
-                        value={ordersSearch}
-                        onChange={(event) => setOrdersSearch(event.target.value)}
-                        placeholder="Ex.: 12, compra de insumos, entregue"
+                        value={ordersFilters.id}
+                        onChange={(event) => updateOrdersFilter('id', event.target.value)}
+                        placeholder="Ex.: 12"
                       />
+                    </label>
+
+                    <label className="search-field">
+                      <span>Filtrar por status</span>
+                      <select
+                        value={ordersFilters.status}
+                        onChange={(event) => updateOrdersFilter('status', event.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        {historyFilterStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {formatOrderStatus(status)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="search-field">
+                      <span>Filtrar por solicitante</span>
+                      <select
+                        value={ordersFilters.requesterId}
+                        onChange={(event) => updateOrdersFilter('requesterId', event.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} (@{user.username})
+                          </option>
+                        ))}
+                      </select>
                     </label>
                   </div>
 
                   {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
-                  {isLoadingOrders ? <p>Carregando historico...</p> : null}
+                  {isLoadingOrders ? <p>Carregando Histórico...</p> : null}
                   {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
 
                   {!isLoadingOrders && !ordersError ? (
                     <div className="orders-table">
                       <div className="orders-table__head">
                         <span>ID</span>
-                        <span>Ultima atualizacao</span>
-                        <span>Descricao</span>
+                        <span>Última atualização</span>
+                        <span>Solicitante</span>
+                        <span>Descrição</span>
                         <span>Itens</span>
-                        <span>Urgencia</span>
+                        <span>urgência</span>
                         <span>Status</span>
-                        <span>Acoes</span>
+                        <span>Ações</span>
                       </div>
 
                       <div className="orders-table__body">
@@ -1677,6 +1777,7 @@ function App() {
                             <article key={order.id} className="order-row">
                               <strong>#{order.id}</strong>
                               <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
+                              <span>{order.requesterName || order.requesterUsername || '-'}</span>
                               <span>{order.requestName || '-'}</span>
                               <span>{order.itemsCount}</span>
                               <span
@@ -1692,7 +1793,7 @@ function App() {
                                 className="button button--blue"
                                 onClick={() => openOrderActions(order.id)}
                               >
-                                Acoes
+                                Ações
                               </button>
                             </article>
                           ))
@@ -1712,14 +1813,14 @@ function App() {
               <div className="section-header section-header--page">
                 <div>
                   <p className="eyebrow">Gerenciamento</p>
-                  <h1 className="page-title">Usuarios</h1>
+                  <h1 className="page-title">Usuários</h1>
                   <p className="description">
                     Cadastre, atualize e revise acessos ao painel administrativo.
                   </p>
                 </div>
 
                 <button type="button" className="button button--ghost" onClick={resetUserForm}>
-                  Novo usuario
+                  Novo Usuário
                 </button>
               </div>
 
@@ -1773,7 +1874,7 @@ function App() {
                   ? 'Salvando...'
                   : userForm.id
                     ? 'Atualizar usuario'
-                    : 'Criar usuario'}
+                    : 'Criar usuário'}
               </button>
               </form>
             </article>
@@ -1782,11 +1883,11 @@ function App() {
               <div className="section-header">
                 <div>
                   <p className="eyebrow">Base atual</p>
-                  <h2>Lista de usuarios</h2>
+                  <h2>Lista de Usuários</h2>
                 </div>
               </div>
 
-            {isLoadingUsers ? <p>Carregando usuarios...</p> : null}
+            {isLoadingUsers ? <p>Carregando Usuários...</p> : null}
             {usersError ? <p className="feedback feedback--error">{usersError}</p> : null}
 
             {!isLoadingUsers && !usersError ? (
