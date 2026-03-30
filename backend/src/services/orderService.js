@@ -1,5 +1,18 @@
 import { pool } from '../config/db.js';
 
+const statusAliases = {
+  pendente: ['pendente', 'pending'],
+  pending: ['pendente', 'pending'],
+  comprado: ['comprado', 'purchased'],
+  purchased: ['comprado', 'purchased'],
+  'aguardando entrega': ['aguardando entrega', 'waiting_delivery'],
+  waiting_delivery: ['aguardando entrega', 'waiting_delivery'],
+  entregue: ['entregue', 'delivered'],
+  delivered: ['entregue', 'delivered'],
+  cancelado: ['cancelado', 'cancelled'],
+  cancelled: ['cancelado', 'cancelled']
+};
+
 function normalizeOrder(row) {
   return {
     id: row.id,
@@ -54,13 +67,28 @@ async function insertOrderHistory(client, { orderId, userId, description }) {
   );
 }
 
-async function listOrders(searchTerm = '') {
-  const normalizedSearch = searchTerm.trim();
-  const hasSearch = normalizedSearch.length > 0;
-  const searchValue = `%${normalizedSearch}%`;
-  const params = hasSearch
-    ? [searchValue, /^\d+$/.test(normalizedSearch) ? Number(normalizedSearch) : null]
-    : [];
+async function listOrders(filters = {}) {
+  const normalizedId = String(filters.id ?? '').trim();
+  const normalizedStatus = String(filters.status ?? '').trim();
+  const normalizedRequesterId = String(filters.requesterId ?? '').trim();
+  const whereClauses = [];
+  const params = [];
+
+  if (/^\d+$/.test(normalizedId)) {
+    params.push(Number(normalizedId));
+    whereClauses.push(`o.id = $${params.length}`);
+  }
+
+  if (normalizedStatus) {
+    const acceptedStatuses = statusAliases[normalizedStatus] || [normalizedStatus];
+    params.push(acceptedStatuses);
+    whereClauses.push(`o.status = ANY($${params.length}::text[])`);
+  }
+
+  if (/^\d+$/.test(normalizedRequesterId)) {
+    params.push(Number(normalizedRequesterId));
+    whereClauses.push(`o.user_id = $${params.length}`);
+  }
 
   const result = await pool.query(
     `
@@ -83,16 +111,7 @@ async function listOrders(searchTerm = '') {
       FROM orders o
       INNER JOIN users u ON u.id = o.user_id
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      ${
-        hasSearch
-          ? `
-      WHERE
-        o.request_name ILIKE $1
-        OR o.status ILIKE $1
-        OR ($2::integer IS NOT NULL AND o.id = $2::integer)
-      `
-          : ''
-      }
+      ${whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''}
       GROUP BY
         o.id,
         o.user_id,
@@ -336,7 +355,7 @@ async function updateOrder(orderId, { userId, status, estimatedDelivery, comment
 
     if ((currentOrder.estimatedDelivery || '') !== (estimatedDelivery || '')) {
       historyEntries.push(
-        `Previsao de entrega alterada para "${estimatedDelivery || 'sem data'}".`
+        `Previsão de entrega alterada para "${estimatedDelivery || 'sem data'}".`
       );
     }
 

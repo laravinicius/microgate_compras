@@ -1814,9 +1814,6 @@ function App() {
                 <div>
                   <p className="eyebrow">Gerenciamento</p>
                   <h1 className="page-title">Usuários</h1>
-                  <p className="description">
-                    Cadastre, atualize e revise acessos ao painel administrativo.
-                  </p>
                 </div>
 
                 <button type="button" className="button button--ghost" onClick={resetUserForm}>

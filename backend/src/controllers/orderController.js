@@ -31,7 +31,7 @@ function toCurrencyNumber(value) {
 
 function validateItems(items, allowPartial = false) {
   if (!Array.isArray(items) || items.length === 0) {
-    return 'Adicione ao menos um item na solicitacao.';
+    return 'Adicione ao menos um item na Solicitação.';
   }
 
   for (const item of items) {
@@ -79,7 +79,7 @@ async function createOrderHandler(request, response, next) {
 
     if (!['normal', 'priority'].includes(urgency)) {
       response.status(400).json({
-        error: 'Urgencia invalida.'
+        error: 'urgência invalida.'
       });
       return;
     }
@@ -132,8 +132,14 @@ async function createOrderHandler(request, response, next) {
 
 async function listOrdersHandler(request, response, next) {
   try {
-    const search = String(request.query?.search ?? '').trim();
-    const orders = await listOrders(search);
+    const id = String(request.query?.id ?? '').trim();
+    const status = String(request.query?.status ?? '').trim().toLowerCase();
+    const requesterId = String(request.query?.requesterId ?? '').trim();
+    const orders = await listOrders({
+      id,
+      status,
+      requesterId
+    });
 
     response.json({ orders });
   } catch (error) {
