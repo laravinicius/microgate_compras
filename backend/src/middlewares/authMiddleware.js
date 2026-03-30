@@ -1,6 +1,30 @@
 import { findUserById, normalizeUser } from '../services/userService.js';
 import { verifyToken } from '../utils/token.js';
 
+function normalizeRole(role) {
+  if (role === 'admin') {
+    return 'administrador';
+  }
+
+  if (role === 'user') {
+    return 'solicitante';
+  }
+
+  return role;
+}
+
+function isAdministrator(user) {
+  return normalizeRole(user?.role) === 'administrador';
+}
+
+function isBuyer(user) {
+  return normalizeRole(user?.role) === 'comprador';
+}
+
+function isRequester(user) {
+  return normalizeRole(user?.role) === 'solicitante';
+}
+
 async function requireAuth(request, response, next) {
   try {
     const authorizationHeader = request.headers.authorization ?? '';
@@ -34,7 +58,7 @@ async function requireAuth(request, response, next) {
 }
 
 function requireAdmin(request, response, next) {
-  if (request.user?.role !== 'admin') {
+  if (!isAdministrator(request.user)) {
     response.status(403).json({
       error: 'Acesso permitido apenas para administradores.'
     });
@@ -44,4 +68,11 @@ function requireAdmin(request, response, next) {
   next();
 }
 
-export { requireAdmin, requireAuth };
+export {
+  isAdministrator,
+  isBuyer,
+  isRequester,
+  normalizeRole,
+  requireAdmin,
+  requireAuth
+};

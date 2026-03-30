@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(120) NOT NULL,
   username VARCHAR(80) NOT NULL UNIQUE,
   password_hash TEXT,
-  role VARCHAR(20) NOT NULL DEFAULT 'user',
+  role VARCHAR(20) NOT NULL DEFAULT 'solicitante',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -14,7 +14,15 @@ ALTER TABLE users
 ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 ALTER TABLE users
-ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'solicitante';
+
+UPDATE users
+SET role = 'administrador'
+WHERE role = 'admin';
+
+UPDATE users
+SET role = 'solicitante'
+WHERE role = 'user';
 
 UPDATE users
 SET username = 'admin'
@@ -128,7 +136,7 @@ ON CONFLICT (username) DO NOTHING;
 
 UPDATE users
 SET
-  role = 'admin',
+  role = 'administrador',
   password_hash = 'microgate-admin:6c20e0d5e52c78dc7a0377003765a0672a172cf7fef2bdf195364d4dfb0a2392ad76fa310d242f5dadacc40b76c9162adff2c7ad3bbbc8c676d34d0ffd1bb745'
 WHERE username = 'admin';
 

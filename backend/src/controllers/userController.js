@@ -5,6 +5,8 @@ import {
   updateUser
 } from '../services/userService.js';
 
+const allowedRoles = ['administrador', 'comprador', 'solicitante'];
+
 function validateUserPayload({ name, username, password, role }, isEditing = false) {
   if (!String(name ?? '').trim()) {
     return 'Informe o nome do usuario.';
@@ -18,7 +20,7 @@ function validateUserPayload({ name, username, password, role }, isEditing = fal
     return 'Informe a senha do usuario.';
   }
 
-  if (!['admin', 'user'].includes(role)) {
+  if (!allowedRoles.includes(role)) {
     return 'Perfil de usuario invalido.';
   }
 
@@ -40,7 +42,7 @@ async function createUserHandler(request, response, next) {
       name: String(request.body?.name ?? '').trim(),
       username: String(request.body?.username ?? '').trim().toLowerCase(),
       password: String(request.body?.password ?? ''),
-      role: String(request.body?.role ?? 'user').trim()
+      role: String(request.body?.role ?? 'solicitante').trim()
     };
     const validationError = validateUserPayload(payload);
 
@@ -62,7 +64,7 @@ async function updateUserHandler(request, response, next) {
       name: String(request.body?.name ?? '').trim(),
       username: String(request.body?.username ?? '').trim().toLowerCase(),
       password: String(request.body?.password ?? ''),
-      role: String(request.body?.role ?? 'user').trim()
+      role: String(request.body?.role ?? 'solicitante').trim()
     };
     const validationError = validateUserPayload(payload, true);
 

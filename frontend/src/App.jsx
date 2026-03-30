@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import microgateLogo from './assets/microgate2.png';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
@@ -10,12 +11,33 @@ const orderStatuses = [
   'cancelado'
 ];
 
+const orderStatusLabels = {
+  pending: 'pendente',
+  purchased: 'comprado',
+  waiting_delivery: 'aguardando entrega',
+  delivered: 'entregue',
+  cancelled: 'cancelado',
+  pendente: 'pendente',
+  comprado: 'comprado',
+  'aguardando entrega': 'aguardando entrega',
+  entregue: 'entregue',
+  cancelado: 'cancelado'
+};
+
+const roleLabels = {
+  admin: 'Administrador',
+  user: 'Solicitante',
+  administrador: 'Administrador',
+  comprador: 'Comprador',
+  solicitante: 'Solicitante'
+};
+
 const emptyUserForm = {
   id: null,
   name: '',
   username: '',
   password: '',
-  role: 'user'
+  role: 'solicitante'
 };
 
 const createEmptyRequestItem = () => ({
@@ -35,6 +57,13 @@ const createEmptyRequestForm = () => ({
   items: [createEmptyRequestItem()]
 });
 
+const isFinishedStatus = (status) =>
+  status === 'entregue' ||
+  status === 'delivered' ||
+  status === 'cancelado' ||
+  status === 'cancelled';
+const isPendingStatus = (status) => status === 'pendente' || status === 'pending';
+
 function formatCurrencyValue(value) {
   const numericValue = Number(value);
 
@@ -51,6 +80,66 @@ function formatDateTime(value) {
   }
 
   return new Date(value).toLocaleString('pt-BR');
+}
+
+function normalizeDateInputValue(value) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function formatOrderStatus(status) {
+  return orderStatusLabels[status] || status || '-';
+}
+
+function normalizeRole(role) {
+  if (role === 'admin') {
+    return 'administrador';
+  }
+
+  if (role === 'user') {
+    return 'solicitante';
+  }
+
+  return role;
+}
+
+function isAdministrator(user) {
+  return normalizeRole(user?.role) === 'administrador';
+}
+
+function isBuyer(user) {
+  return normalizeRole(user?.role) === 'comprador';
+}
+
+function isRequester(user) {
+  return normalizeRole(user?.role) === 'solicitante';
+}
+
+function canManageUsers(user) {
+  return isAdministrator(user);
+}
+
+function canEditOrder(user, order) {
+  if (!user || !order) {
+    return false;
+  }
+
+  return (
+    isAdministrator(user) ||
+    isBuyer(user) ||
+    (isRequester(user) && Number(order.userId) === Number(user.id))
+  );
+}
+
+function canDeleteOrder(user) {
+  return isAdministrator(user);
+}
+
+function formatRoleLabel(role) {
+  return roleLabels[normalizeRole(role)] || role || '-';
 }
 
 function App() {
@@ -84,6 +173,24 @@ function App() {
   const [userForm, setUserForm] = useState(emptyUserForm);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+  const [popup, setPopup] = useState(null);
+
+  const activeOrders = orders.filter((order) => !isFinishedStatus(order.status));
+  const historicalOrders = orders.filter((order) => isFinishedStatus(order.status));
+  const selectedOrderCanEdit = canEditOrder(currentUser, selectedOrder);
+  const selectedOrderCanDelete = canDeleteOrder(currentUser);
+
+  useEffect(() => {
+    if (!popup) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPopup(null);
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [popup]);
 
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
@@ -139,7 +246,7 @@ function App() {
   }, [currentUser, token, ordersSearch]);
 
   useEffect(() => {
-    if (currentUser?.role === 'admin') {
+    if (canManageUsers(currentUser)) {
       loadUsers(token);
     } else {
       setUsers([]);
@@ -234,7 +341,10 @@ function App() {
         throw new Error(data.error || 'Nao foi possivel carregar o pedido.');
       }
 
-      setSelectedOrder(data.order);
+      setSelectedOrder({
+        ...data.order,
+        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery)
+      });
     } catch (error) {
       setSelectedOrderError(error.message);
     } finally {
@@ -392,6 +502,7 @@ function App() {
 
   function changeTab(nextTab) {
     if (nextTab === activeTab) {
+      closeOrderActions();
       return;
     }
 
@@ -399,10 +510,7 @@ function App() {
       return;
     }
 
-    if (nextTab !== 'panel') {
-      closeOrderActions();
-    }
-
+    closeOrderActions();
     setActiveTab(nextTab);
   }
 
@@ -486,6 +594,10 @@ function App() {
       setRequestForm(createEmptyRequestForm());
       setRequestMessageType('success');
       setRequestMessage('Solicitacao enviada com sucesso.');
+      setPopup({
+        type: 'success',
+        message: 'Solicitacao enviada com sucesso.'
+      });
       setActiveTab('panel');
       await loadOrders(token, ordersSearch);
     } catch (error) {
@@ -581,7 +693,15 @@ function App() {
   async function handleSaveSelectedOrder(event) {
     event.preventDefault();
 
-    if (!selectedOrder) {
+    if (!selectedOrder || !canEditOrder(currentUser, selectedOrder)) {
+      return;
+    }
+
+    if (selectedOrder.estimatedDelivery && isPendingStatus(selectedOrder.status)) {
+      setPopup({
+        type: 'warning',
+        message: 'Defina um status diferente de pendente ao informar uma previsao de entrega.'
+      });
       return;
     }
 
@@ -612,9 +732,20 @@ function App() {
         throw new Error(data.error || 'Nao foi possivel salvar o pedido.');
       }
 
-      setSelectedOrder(data.order);
+      setSelectedOrder({
+        ...data.order,
+        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery)
+      });
       setOrderActionMessage('Pedido atualizado com sucesso.');
+      setPopup({
+        type: 'success',
+        message: 'Alteracoes salvas com sucesso.'
+      });
       await loadOrders(token, ordersSearch);
+
+      if (isFinishedStatus(data.order.status)) {
+        setActiveTab('history');
+      }
     } catch (error) {
       setOrderActionMessage(error.message);
     } finally {
@@ -623,7 +754,7 @@ function App() {
   }
 
   async function handleDeleteSelectedOrder() {
-    if (!selectedOrder) {
+    if (!selectedOrder || !canDeleteOrder(currentUser)) {
       return;
     }
 
@@ -667,117 +798,145 @@ function App() {
 
   if (isBootstrapping) {
     return (
-      <main className="page">
-        <section className="panel panel--centered">
-          <p className="eyebrow">Sistema de Compras</p>
-          <h1>Validando sessao...</h1>
-        </section>
-      </main>
+      <div className="app-shell">
+        <main className="page page--auth">
+          <section className="panel panel--centered panel--auth">
+            <div className="auth-brand">
+              <img src={microgateLogo} alt="Microgate" className="auth-brand__logo" />
+              <div>
+                <p className="eyebrow">Sistema de Compras</p>
+                <h1>Validando sessao...</h1>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
     );
   }
 
   if (!currentUser) {
     return (
-      <main className="page">
-        <section className="panel intro">
-          <div>
-            <p className="eyebrow">Sistema de Compras</p>
-            <h1>Acesso administrativo</h1>
-            <p className="description">
-              Entre com seu usuario para acessar o painel e gerenciar contas.
-            </p>
-          </div>
+      <div className="app-shell">
+        <main className="page page--auth">
+          <section className="panel panel--centered panel--auth-compact">
+            <form className="auth-form auth-form--panel" onSubmit={handleLogin}>
+              <div className="auth-brand auth-brand--stacked">
+                <img src={microgateLogo} alt="Microgate" className="auth-brand__logo" />
+                <h2>Sistema de Compras</h2>
+                <p className="eyebrow">Entrar</p>
+              </div>
 
-          <form className="auth-form" onSubmit={handleLogin}>
-            <label>
-              <span>Usuario</span>
-              <input
-                type="text"
-                value={loginForm.username}
-                onChange={(event) => updateLoginField('username', event.target.value)}
-                placeholder="admin"
-                autoComplete="username"
-              />
-            </label>
+              <label>
+                <span>Usuario</span>
+                <input
+                  type="text"
+                  value={loginForm.username}
+                  onChange={(event) => updateLoginField('username', event.target.value)}
+                  placeholder="admin"
+                  autoComplete="username"
+                />
+              </label>
 
-            <label>
-              <span>Senha</span>
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(event) => updateLoginField('password', event.target.value)}
-                placeholder="Informe sua senha"
-                autoComplete="current-password"
-              />
-            </label>
+              <label>
+                <span>Senha</span>
+                <input
+                  type="password"
+                  value={loginForm.password}
+                  onChange={(event) => updateLoginField('password', event.target.value)}
+                  placeholder="Informe sua senha"
+                  autoComplete="current-password"
+                />
+              </label>
 
-            {loginError ? <p className="feedback feedback--error">{loginError}</p> : null}
+              {loginError ? <p className="feedback feedback--error">{loginError}</p> : null}
 
-            <button type="submit" className="button" disabled={isLoggingIn}>
-              {isLoggingIn ? 'Entrando...' : 'Entrar'}
-            </button>
-
-            <p className="hint">
-              Usuario inicial: <strong>admin</strong>
-            </p>
-          </form>
-        </section>
-      </main>
+              <button type="submit" className="button" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Entrando...' : 'Entrar'}
+              </button>
+            </form>
+          </section>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="page page--dashboard">
-      <section className="panel topbar topbar--integrated">
-        <div className="topbar__brand">
-          <p className="eyebrow">Sistema de Compras</p>
-          <h1>Compras</h1>
-        </div>
+    <div className="app-shell">
+      <header className="site-header">
+        <div className="site-header__inner">
+          <div className="site-brand">
+            <img src={microgateLogo} alt="Microgate" className="site-brand__logo" />
+            <div className="site-brand__copy">
+              <p className="eyebrow">Sistema de Compras</p>
+              <strong>Microgate Compras</strong>
+              <span>{currentUser.name}</span>
+            </div>
+          </div>
 
-        <div className="topbar__right">
-          <nav className="tabbar">
-            <button
-              type="button"
-              className={`tab-button ${activeTab === 'request' ? 'tab-button--active' : ''}`}
-              onClick={() => changeTab('request')}
-            >
-              Nova solicitacao
-            </button>
-            <button
-              type="button"
-              className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
-              onClick={() => changeTab('panel')}
-            >
-              Painel de compras
-            </button>
-            {currentUser.role === 'admin' ? (
+          <div className="site-header__actions">
+            <nav className="tabbar">
               <button
                 type="button"
-                className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
-                onClick={() => changeTab('users')}
+                className={`tab-button tab-button--green ${activeTab === 'request' ? 'tab-button--active' : ''}`}
+                onClick={() => changeTab('request')}
               >
-                Usuarios
+                Nova solicitacao
               </button>
-            ) : null}
-          </nav>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
+                onClick={() => changeTab('panel')}
+              >
+                Painel de compras
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'history' ? 'tab-button--active' : ''}`}
+                onClick={() => changeTab('history')}
+              >
+                Historico
+              </button>
+              {canManageUsers(currentUser) ? (
+                <button
+                  type="button"
+                  className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
+                  onClick={() => changeTab('users')}
+                >
+                  Usuarios
+                </button>
+              ) : null}
+            </nav>
 
-          <button type="button" className="button button--ghost" onClick={handleLogout}>
-            Sair
-          </button>
+            <button type="button" className="button button--danger" onClick={handleLogout}>
+              Sair
+            </button>
+          </div>
         </div>
-      </section>
+      </header>
 
-      {activeTab === 'request' ? (
-        <section className="request-layout">
-          <article className="panel">
-            <div className="section-header">
-              <div>
-                <p className="eyebrow">Nova solicitacao</p>
-                <h2>Preencha os dados do pedido</h2>
-              </div>
+      <main className="page page--dashboard">
+        {popup ? (
+          <div className="popup-overlay" role="status" aria-live="polite" aria-atomic="true">
+            <div className={`popup popup--${popup.type}`}>
+              <p>{popup.message}</p>
             </div>
+          </div>
+        ) : null}
 
-            <form className="request-form" onSubmit={handleRequestSubmit}>
+        {activeTab === 'request' ? (
+          <section className="request-layout">
+            <article className="panel">
+              <div className="section-header section-header--page">
+                <div>
+                  <p className="eyebrow">Nova solicitacao</p>
+                  <h1 className="page-title">Preencha os dados do pedido</h1>
+                  <p className="description">
+                    Registre os itens, prioridade e referencia de OS para encaminhar a compra.
+                  </p>
+                </div>
+              </div>
+
+              <form className="request-form" onSubmit={handleRequestSubmit}>
               <div className="form-grid form-grid--request-line">
                 <label>
                   <span>Nome do pedido</span>
@@ -833,30 +992,30 @@ function App() {
                 </label>
               </div>
 
-              <div className="items-header">
-                <div>
-                  <p className="eyebrow">Itens</p>
-                  <h2>Produtos da solicitacao</h2>
+                <div className="items-header">
+                  <div>
+                    <p className="eyebrow">Itens</p>
+                    <h2>Produtos da solicitacao</h2>
+                  </div>
+
+                  <button type="button" className="button button--ghost" onClick={addRequestItem}>
+                    Adicionar item
+                  </button>
                 </div>
 
-                <button type="button" className="button button--ghost" onClick={addRequestItem}>
-                  Adicionar item
-                </button>
-              </div>
-
-              <div className="items-list">
-                {requestForm.items.map((item, index) => (
-                  <article key={index} className="item-card">
-                    <div className="item-card__header">
-                      <h3>Item {index + 1}</h3>
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        onClick={() => removeRequestItem(index)}
-                      >
-                        Remover
-                      </button>
-                    </div>
+                <div className="items-list">
+                  {requestForm.items.map((item, index) => (
+                    <article key={index} className="item-card">
+                      <div className="item-card__header">
+                        <h3>Item {index + 1}</h3>
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          onClick={() => removeRequestItem(index)}
+                        >
+                          Remover
+                        </button>
+                      </div>
 
                     <div className="form-grid">
                       <label>
@@ -927,66 +1086,71 @@ function App() {
                         <input type="text" value={item.saleValue} readOnly />
                       </label>
                     </div>
-                  </article>
-                ))}
-              </div>
+                    </article>
+                  ))}
+                </div>
 
-              {requestMessage ? (
-                <p
-                  className={`feedback ${
-                    requestMessageType === 'error' ? 'feedback--error' : ''
-                  }`}
-                >
-                  {requestMessage}
-                </p>
-              ) : null}
+                {requestMessage ? (
+                  <p
+                    className={`feedback ${
+                      requestMessageType === 'error' ? 'feedback--error' : ''
+                    }`}
+                  >
+                    {requestMessage}
+                  </p>
+                ) : null}
 
-              <button type="submit" className="button" disabled={isSubmittingRequest}>
-                {isSubmittingRequest ? 'Enviando...' : 'Enviar solicitacao'}
-              </button>
-            </form>
-          </article>
-        </section>
-      ) : null}
+                <button type="submit" className="button button--green" disabled={isSubmittingRequest}>
+                  {isSubmittingRequest ? 'Enviando...' : 'Enviar solicitacao'}
+                </button>
+              </form>
+            </article>
+          </section>
+        ) : null}
 
-      {activeTab === 'panel' ? (
-        <section className="request-layout">
-          <article className="panel">
-            {selectedOrder ? (
-              <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
-                <div className="section-header">
-                  <div>
-                    <p className="eyebrow">Pedido #{selectedOrder.id}</p>
-                    <h2>{selectedOrder.requestName}</h2>
-                  </div>
+        {activeTab === 'panel' ? (
+          <section className="request-layout">
+            <article className="panel">
+              {selectedOrder ? (
+                <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
+                  <div className="section-header section-header--page">
+                    <div>
+                      <p className="eyebrow">Pedido #{selectedOrder.id}</p>
+                      <h1 className="page-title">{selectedOrder.requestName}</h1>
+                      <p className="description">
+                        Acompanhe status, valores e historico desta solicitacao.
+                      </p>
+                    </div>
 
-                  <div className="order-actions__top-buttons">
-                    <button
-                      type="submit"
-                      className="button"
-                      disabled={isSavingSelectedOrder}
-                    >
-                      {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
-                    </button>
-                    <button
-                      type="button"
-                      className="button button--ghost"
-                      onClick={closeOrderActions}
-                    >
-                      Voltar
-                    </button>
-                    {currentUser.role === 'admin' ? (
+                    <div className="order-actions__top-buttons">
+                      {selectedOrderCanEdit ? (
+                        <button
+                          type="submit"
+                          className="button button--green"
+                          disabled={isSavingSelectedOrder}
+                        >
+                          {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className="button button--danger"
-                        onClick={handleDeleteSelectedOrder}
-                        disabled={isDeletingSelectedOrder}
+                        className="button button--ghost"
+                        onClick={closeOrderActions}
                       >
-                        {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                        Voltar
                       </button>
-                    ) : null}
+                      {selectedOrderCanDelete ? (
+                        <button
+                          type="button"
+                          className="button button--danger"
+                          onClick={handleDeleteSelectedOrder}
+                          disabled={isDeletingSelectedOrder}
+                        >
+                          {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
 
                 {selectedOrderError ? (
                   <p className="feedback feedback--error">{selectedOrderError}</p>
@@ -1039,10 +1203,11 @@ function App() {
                         onChange={(event) =>
                           updateSelectedOrderField('status', event.target.value)
                         }
+                        disabled={!selectedOrderCanEdit}
                       >
                         {orderStatuses.map((status) => (
                           <option key={status} value={status}>
-                            {status}
+                            {formatOrderStatus(status)}
                           </option>
                         ))}
                       </select>
@@ -1052,10 +1217,11 @@ function App() {
                       <span>Previsao de entrega</span>
                       <input
                         type="date"
-                        value={selectedOrder.estimatedDelivery || ''}
+                        value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
                         onChange={(event) =>
                           updateSelectedOrderField('estimatedDelivery', event.target.value)
                         }
+                        disabled={!selectedOrderCanEdit}
                       />
                     </label>
                   </div>
@@ -1068,6 +1234,7 @@ function App() {
                         updateSelectedOrderField('comments', event.target.value)
                       }
                       rows={4}
+                      disabled={!selectedOrderCanEdit}
                     />
                   </label>
                 </section>
@@ -1112,6 +1279,7 @@ function App() {
                             onChange={(event) =>
                               updateSelectedOrderItem(item.id, 'productValue', event.target.value)
                             }
+                            disabled={!selectedOrderCanEdit}
                           />
                           <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
                           <input
@@ -1122,6 +1290,7 @@ function App() {
                             onChange={(event) =>
                               updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
                             }
+                            disabled={!selectedOrderCanEdit}
                           />
                         </article>
                       ))}
@@ -1160,15 +1329,18 @@ function App() {
                 </section>
 
                 {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
-              </form>
-            ) : (
-              <>
-                <div className="section-header">
-                  <div>
-                    <p className="eyebrow">Painel de compras</p>
-                    <h2>Lista das requisicoes</h2>
+                </form>
+              ) : (
+                <>
+                  <div className="section-header section-header--page">
+                    <div>
+                      <p className="eyebrow">Painel de compras</p>
+                      <h1 className="page-title">Lista das requisicoes</h1>
+                      <p className="description">
+                        Consulte pedidos ativos, andamento de compras e movimentacoes recentes.
+                      </p>
+                    </div>
                   </div>
-                </div>
 
                 <div className="panel-toolbar">
                   <label className="search-field">
@@ -1199,20 +1371,26 @@ function App() {
                     </div>
 
                     <div className="orders-table__body">
-                      {orders.length === 0 ? (
-                        <p className="empty-state">Nenhuma requisicao encontrada.</p>
+                      {activeOrders.length === 0 ? (
+                        <p className="empty-state">Nenhuma requisicao ativa encontrada.</p>
                       ) : (
-                        orders.map((order) => (
+                        activeOrders.map((order) => (
                           <article key={order.id} className="order-row">
                             <strong>#{order.id}</strong>
                             <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
                             <span>{order.requestName || '-'}</span>
                             <span>{order.itemsCount}</span>
-                            <span>{order.urgency === 'priority' ? 'Prioridade' : 'Normal'}</span>
-                            <span className="status-chip">{order.status}</span>
+                            <span
+                              className={
+                                order.urgency === 'priority' ? 'urgency-label urgency-label--priority' : 'urgency-label'
+                              }
+                            >
+                              {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+                            </span>
+                            <span className="status-chip">{formatOrderStatus(order.status)}</span>
                             <button
                               type="button"
-                              className="button button--ghost"
+                              className="button button--blue"
                               onClick={() => openOrderActions(order.id)}
                             >
                               Acoes
@@ -1223,27 +1401,329 @@ function App() {
                     </div>
                   </div>
                 ) : null}
-              </>
-            )}
-          </article>
-        </section>
-      ) : null}
+                </>
+              )}
+            </article>
+          </section>
+        ) : null}
 
-      {activeTab === 'users' && currentUser.role === 'admin' ? (
-        <section className="dashboard-grid">
-          <article className="panel">
-            <div className="section-header">
-              <div>
-                <p className="eyebrow">Gerenciamento</p>
-                <h2>Usuarios</h2>
+        {activeTab === 'history' ? (
+          <section className="request-layout">
+            <article className="panel">
+              {selectedOrder ? (
+                <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
+                  <div className="section-header section-header--page">
+                    <div>
+                      <p className="eyebrow">Historico do pedido #{selectedOrder.id}</p>
+                      <h1 className="page-title">{selectedOrder.requestName}</h1>
+                      <p className="description">
+                        Requisicoes entregues sao consideradas finalizadas e ficam arquivadas aqui.
+                      </p>
+                    </div>
+
+                    <div className="order-actions__top-buttons">
+                      {selectedOrderCanEdit ? (
+                        <button
+                          type="submit"
+                          className="button button--green"
+                          disabled={isSavingSelectedOrder}
+                        >
+                          {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        onClick={closeOrderActions}
+                      >
+                        Voltar
+                      </button>
+                      {selectedOrderCanDelete ? (
+                        <button
+                          type="button"
+                          className="button button--danger"
+                          onClick={handleDeleteSelectedOrder}
+                          disabled={isDeletingSelectedOrder}
+                        >
+                          {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {selectedOrderError ? (
+                    <p className="feedback feedback--error">{selectedOrderError}</p>
+                  ) : null}
+
+                  <section className="order-block">
+                    <div className="section-header">
+                      <div>
+                        <p className="eyebrow">Informacoes gerais</p>
+                      </div>
+                    </div>
+
+                    <div className="order-general-grid">
+                      <label>
+                        <span>Solicitante</span>
+                        <input
+                          type="text"
+                          value={`${selectedOrder.requesterName} (@${selectedOrder.requesterUsername})`}
+                          readOnly
+                        />
+                      </label>
+
+                      <label>
+                        <span>Data da solicitacao</span>
+                        <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
+                      </label>
+
+                      <label>
+                        <span>OS</span>
+                        <input
+                          type="text"
+                          value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
+                          readOnly
+                        />
+                      </label>
+
+                      <label>
+                        <span>Urgencia</span>
+                        <input
+                          type="text"
+                          value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+                          readOnly
+                        />
+                      </label>
+
+                      <label>
+                        <span>Status do pedido</span>
+                      <select
+                        value={selectedOrder.status}
+                        onChange={(event) =>
+                          updateSelectedOrderField('status', event.target.value)
+                        }
+                        disabled={!selectedOrderCanEdit}
+                      >
+                          {orderStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {formatOrderStatus(status)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Previsao de entrega</span>
+                      <input
+                        type="date"
+                        value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
+                        onChange={(event) =>
+                          updateSelectedOrderField('estimatedDelivery', event.target.value)
+                        }
+                        disabled={!selectedOrderCanEdit}
+                      />
+                      </label>
+                    </div>
+
+                    <label>
+                      <span>Comentarios / Obs</span>
+                    <textarea
+                      value={selectedOrder.comments || ''}
+                      onChange={(event) =>
+                        updateSelectedOrderField('comments', event.target.value)
+                      }
+                      rows={4}
+                      disabled={!selectedOrderCanEdit}
+                    />
+                    </label>
+                  </section>
+
+                  <section className="order-block">
+                    <div className="section-header">
+                      <div>
+                        <p className="eyebrow">Itens solicitados</p>
+                      </div>
+                    </div>
+
+                    <div className="order-items-table">
+                      <div className="order-items-table__head">
+                        <span>Produto</span>
+                        <span>Qtd</span>
+                        <span>Detalhes</span>
+                        <span>Obs</span>
+                        <span>Valor do produto</span>
+                        <span>Valor da venda</span>
+                        <span>Valor repassado</span>
+                      </div>
+
+                      <div className="order-items-table__body">
+                        {selectedOrder.items.map((item) => (
+                          <article key={item.id} className="order-item-row">
+                            <strong>{item.productName}</strong>
+                            <span>{item.quantity}</span>
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
+                              disabled={!item.productLink}
+                            >
+                              Abrir link
+                            </button>
+                            <span>{item.notes || '-'}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.productValue}
+                              onChange={(event) =>
+                                updateSelectedOrderItem(item.id, 'productValue', event.target.value)
+                              }
+                              disabled={!selectedOrderCanEdit}
+                            />
+                            <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.passedValue}
+                              onChange={(event) =>
+                                updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
+                              }
+                              disabled={!selectedOrderCanEdit}
+                            />
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="order-total">
+                      <span>Total do pedido</span>
+                      <strong>R$ {formatCurrencyValue(selectedOrder.total)}</strong>
+                    </div>
+                  </section>
+
+                  <section className="order-block">
+                    <div className="section-header">
+                      <div>
+                        <p className="eyebrow">Historico de alteracoes</p>
+                      </div>
+                    </div>
+
+                    <div className="history-list">
+                      {selectedOrder.history?.length ? (
+                        selectedOrder.history.map((entry) => (
+                          <article key={entry.id} className="history-item">
+                            <div className="history-item__meta">
+                              <strong>{entry.name}</strong>
+                              <span>@{entry.username}</span>
+                              <span>{formatDateTime(entry.createdAt)}</span>
+                            </div>
+                            <p>{entry.description}</p>
+                          </article>
+                        ))
+                      ) : (
+                        <p className="empty-state">Nenhuma alteracao registrada ainda.</p>
+                      )}
+                    </div>
+                  </section>
+
+                  {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
+                </form>
+              ) : (
+                <>
+                  <div className="section-header section-header--page">
+                    <div>
+                      <p className="eyebrow">Historico</p>
+                      <h1 className="page-title">Requisicoes finalizadas</h1>
+                      <p className="description">
+                        Aqui ficam os pedidos entregues, considerados concluidos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="panel-toolbar">
+                    <label className="search-field">
+                      <span>Buscar por ID, descricao ou status</span>
+                      <input
+                        type="text"
+                        value={ordersSearch}
+                        onChange={(event) => setOrdersSearch(event.target.value)}
+                        placeholder="Ex.: 12, compra de insumos, entregue"
+                      />
+                    </label>
+                  </div>
+
+                  {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
+                  {isLoadingOrders ? <p>Carregando historico...</p> : null}
+                  {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
+
+                  {!isLoadingOrders && !ordersError ? (
+                    <div className="orders-table">
+                      <div className="orders-table__head">
+                        <span>ID</span>
+                        <span>Ultima atualizacao</span>
+                        <span>Descricao</span>
+                        <span>Itens</span>
+                        <span>Urgencia</span>
+                        <span>Status</span>
+                        <span>Acoes</span>
+                      </div>
+
+                      <div className="orders-table__body">
+                        {historicalOrders.length === 0 ? (
+                          <p className="empty-state">Nenhuma requisicao finalizada encontrada.</p>
+                        ) : (
+                          historicalOrders.map((order) => (
+                            <article key={order.id} className="order-row">
+                              <strong>#{order.id}</strong>
+                              <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
+                              <span>{order.requestName || '-'}</span>
+                              <span>{order.itemsCount}</span>
+                              <span
+                                className={
+                                  order.urgency === 'priority' ? 'urgency-label urgency-label--priority' : 'urgency-label'
+                                }
+                              >
+                                {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+                              </span>
+                              <span className="status-chip">{formatOrderStatus(order.status)}</span>
+                              <button
+                                type="button"
+                                className="button button--blue"
+                                onClick={() => openOrderActions(order.id)}
+                              >
+                                Acoes
+                              </button>
+                            </article>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </article>
+          </section>
+        ) : null}
+
+        {activeTab === 'users' && canManageUsers(currentUser) ? (
+          <section className="dashboard-grid">
+            <article className="panel">
+              <div className="section-header section-header--page">
+                <div>
+                  <p className="eyebrow">Gerenciamento</p>
+                  <h1 className="page-title">Usuarios</h1>
+                  <p className="description">
+                    Cadastre, atualize e revise acessos ao painel administrativo.
+                  </p>
+                </div>
+
+                <button type="button" className="button button--ghost" onClick={resetUserForm}>
+                  Novo usuario
+                </button>
               </div>
 
-              <button type="button" className="button button--ghost" onClick={resetUserForm}>
-                Novo usuario
-              </button>
-            </div>
-
-            <form className="user-form" onSubmit={handleUserSubmit}>
+              <form className="user-form" onSubmit={handleUserSubmit}>
               <label>
                 <span>Nome</span>
                 <input
@@ -1280,8 +1760,9 @@ function App() {
                   value={userForm.role}
                   onChange={(event) => updateUserField('role', event.target.value)}
                 >
-                  <option value="user">Usuario</option>
-                  <option value="admin">Administrador</option>
+                  <option value="administrador">Administrador</option>
+                  <option value="comprador">Comprador</option>
+                  <option value="solicitante">Solicitante</option>
                 </select>
               </label>
 
@@ -1294,16 +1775,16 @@ function App() {
                     ? 'Atualizar usuario'
                     : 'Criar usuario'}
               </button>
-            </form>
-          </article>
+              </form>
+            </article>
 
-          <article className="panel">
-            <div className="section-header">
-              <div>
-                <p className="eyebrow">Base atual</p>
-                <h2>Lista de usuarios</h2>
+            <article className="panel">
+              <div className="section-header">
+                <div>
+                  <p className="eyebrow">Base atual</p>
+                  <h2>Lista de usuarios</h2>
+                </div>
               </div>
-            </div>
 
             {isLoadingUsers ? <p>Carregando usuarios...</p> : null}
             {usersError ? <p className="feedback feedback--error">{usersError}</p> : null}
@@ -1315,7 +1796,7 @@ function App() {
                     <div>
                       <h3>{user.name}</h3>
                       <p>@{user.username}</p>
-                      <span className="pill">{user.role}</span>
+                      <span className="pill">{formatRoleLabel(user.role)}</span>
                     </div>
 
                     <div className="user-card__actions">
@@ -1339,10 +1820,11 @@ function App() {
                 ))}
               </div>
             ) : null}
-          </article>
-        </section>
-      ) : null}
-    </main>
+            </article>
+          </section>
+        ) : null}
+      </main>
+    </div>
   );
 }
 

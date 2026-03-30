@@ -5,6 +5,11 @@ import {
   listOrders,
   updateOrder
 } from '../services/orderService.js';
+import {
+  isAdministrator,
+  isBuyer,
+  isRequester
+} from '../middlewares/authMiddleware.js';
 
 const allowedStatuses = [
   'pendente',
@@ -184,6 +189,27 @@ async function updateOrderHandler(request, response, next) {
       passedValue: toCurrencyNumber(item.passedValue)
     }));
 
+    const currentOrder = await getOrderById(orderId);
+
+    if (!currentOrder) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    const canUpdateOrder =
+      isAdministrator(request.user) ||
+      isBuyer(request.user) ||
+      (isRequester(request.user) && currentOrder.userId === request.user.id);
+
+    if (!canUpdateOrder) {
+      response.status(403).json({
+        error: 'Voce nao tem permissao para alterar este pedido.'
+      });
+      return;
+    }
+
     const order = await updateOrder(orderId, {
       userId: request.user.id,
       status,
@@ -191,14 +217,6 @@ async function updateOrderHandler(request, response, next) {
       comments,
       items: normalizedItems
     });
-
-    if (!order) {
-      response.status(404).json({
-        error: 'Pedido nao encontrado.'
-      });
-      return;
-    }
-
     response.json({ order });
   } catch (error) {
     next(error);
