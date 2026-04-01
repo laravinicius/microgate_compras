@@ -144,6 +144,223 @@ function formatRoleLabel(role) {
   return roleLabels[normalizeRole(role)] || role || '-';
 }
 
+function OrderTimelineSection({ title, entries, emptyMessage, contentField = 'description' }) {
+  return (
+    <section className="order-block">
+      <div className="section-header">
+        <div>
+          <p className="eyebrow">{title}</p>
+        </div>
+      </div>
+
+      <div className="history-list">
+        {entries?.length ? (
+          entries.map((entry) => (
+            <article key={entry.id} className="history-item">
+              <div className="history-item__meta">
+                <strong>{entry.name}</strong>
+                <span>@{entry.username}</span>
+                <span>{formatDateTime(entry.createdAt)}</span>
+              </div>
+              <p>{entry[contentField]}</p>
+            </article>
+          ))
+        ) : (
+          <p className="empty-state">{emptyMessage}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function OrderDetailContent({
+  currentSection,
+  commentDraft,
+  selectedOrder,
+  selectedOrderCanEdit,
+  updateSelectedOrderCommentDraft,
+  updateSelectedOrderField,
+  updateSelectedOrderItem
+}) {
+  if (currentSection === 'comments') {
+    return (
+      <>
+        <section className="order-block">
+          <div className="section-header">
+            <div>
+              <p className="eyebrow">Comentarios</p>
+            </div>
+          </div>
+
+          <label>
+            <span>Comentarios / Obs</span>
+            <textarea
+              value={commentDraft}
+              onChange={(event) => updateSelectedOrderCommentDraft(event.target.value)}
+              rows={5}
+              disabled={!selectedOrderCanEdit}
+            />
+          </label>
+        </section>
+
+        <OrderTimelineSection
+          title="Histórico de comentarios"
+          entries={selectedOrder.commentsHistory}
+          emptyMessage="Nenhum comentario registrado ainda."
+          contentField="comment"
+        />
+      </>
+    );
+  }
+
+  if (currentSection === 'history') {
+    return (
+      <OrderTimelineSection
+        title="Histórico de alteracoes"
+        entries={selectedOrder.history}
+        emptyMessage="Nenhuma alteracao registrada ainda."
+      />
+    );
+  }
+
+  return (
+    <>
+      <section className="order-block">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Informacoes gerais</p>
+          </div>
+        </div>
+
+        <div className="order-general-grid">
+          <label>
+            <span>Solicitante</span>
+            <input
+              type="text"
+              value={`${selectedOrder.requesterName} (@${selectedOrder.requesterUsername})`}
+              readOnly
+            />
+          </label>
+
+          <label>
+            <span>Data da Solicitação</span>
+            <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
+          </label>
+
+          <label>
+            <span>OS</span>
+            <input
+              type="text"
+              value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
+              readOnly
+            />
+          </label>
+
+          <label>
+            <span>urgência</span>
+            <input
+              type="text"
+              value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+              readOnly
+            />
+          </label>
+
+          <label>
+            <span>Status do pedido</span>
+            <select
+              value={selectedOrder.status}
+              onChange={(event) => updateSelectedOrderField('status', event.target.value)}
+              disabled={!selectedOrderCanEdit}
+            >
+              {orderStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {formatOrderStatus(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Previsão de entrega</span>
+            <input
+              type="date"
+              value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
+              onChange={(event) =>
+                updateSelectedOrderField('estimatedDelivery', event.target.value)
+              }
+              disabled={!selectedOrderCanEdit}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="order-block">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Itens solicitados</p>
+          </div>
+        </div>
+
+        <div className="order-items-table">
+          <div className="order-items-table__head">
+            <span>Produto</span>
+            <span>Qtd</span>
+            <span>Detalhes</span>
+            <span>Obs</span>
+            <span>Valor do produto</span>
+            <span>Valor da venda</span>
+            <span>Valor repassado</span>
+          </div>
+
+          <div className="order-items-table__body">
+            {selectedOrder.items.map((item) => (
+              <article key={item.id} className="order-item-row">
+                <strong>{item.productName}</strong>
+                <span>{item.quantity}</span>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
+                  disabled={!item.productLink}
+                >
+                  Abrir link
+                </button>
+                <span>{item.notes || '-'}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.productValue}
+                  onChange={(event) =>
+                    updateSelectedOrderItem(item.id, 'productValue', event.target.value)
+                  }
+                  disabled={!selectedOrderCanEdit}
+                />
+                <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.passedValue}
+                  onChange={(event) =>
+                    updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
+                  }
+                  disabled={!selectedOrderCanEdit}
+                />
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="order-total">
+          <span>Total do pedido</span>
+          <strong>R$ {formatCurrencyValue(selectedOrder.total)}</strong>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(tokenStorageKey) || '');
   const [currentUser, setCurrentUser] = useState(null);
@@ -173,6 +390,8 @@ function App() {
   const [orderActionMessage, setOrderActionMessage] = useState('');
   const [isSavingSelectedOrder, setIsSavingSelectedOrder] = useState(false);
   const [isDeletingSelectedOrder, setIsDeletingSelectedOrder] = useState(false);
+  const [selectedOrderSection, setSelectedOrderSection] = useState('order');
+  const [selectedOrderCommentDraft, setSelectedOrderCommentDraft] = useState('');
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState('');
@@ -374,8 +593,11 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
-        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery)
+        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
+        history: data.order.history || [],
+        commentsHistory: data.order.commentsHistory || []
       });
+      setSelectedOrderCommentDraft(data.order.comments || '');
     } catch (error) {
       setSelectedOrderError(error.message);
     } finally {
@@ -389,6 +611,11 @@ function App() {
       ...current,
       [field]: value
     }));
+  }
+
+  function updateSelectedOrderCommentDraft(value) {
+    setOrderActionMessage('');
+    setSelectedOrderCommentDraft(value);
   }
 
   function updateSelectedOrderItem(itemId, field, value) {
@@ -430,6 +657,7 @@ function App() {
 
   function openOrderActions(orderId) {
     setActiveTab('panel');
+    setSelectedOrderSection('order');
     loadOrderDetails(orderId);
   }
 
@@ -437,6 +665,8 @@ function App() {
     setSelectedOrder(null);
     setSelectedOrderError('');
     setOrderActionMessage('');
+    setSelectedOrderSection('order');
+    setSelectedOrderCommentDraft('');
   }
 
   function clearSession() {
@@ -756,7 +986,7 @@ function App() {
         body: JSON.stringify({
           status: selectedOrder.status,
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
-          comments: selectedOrder.comments || '',
+          comments: selectedOrderCommentDraft || '',
           items: selectedOrder.items.map((item) => ({
             id: item.id,
             productValue: Number(item.productValue || 0),
@@ -772,8 +1002,12 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
-        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery)
+        comments: selectedOrderCommentDraft,
+        estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
+        history: data.order.history || [],
+        commentsHistory: data.order.commentsHistory || []
       });
+      setSelectedOrderCommentDraft(selectedOrderCommentDraft);
       setOrderActionMessage('Pedido atualizado com sucesso.');
       setPopup({
         type: 'success',
@@ -870,7 +1104,7 @@ function App() {
                   type="text"
                   value={loginForm.username}
                   onChange={(event) => updateLoginField('username', event.target.value)}
-                  placeholder="admin"
+                  placeholder="Informe seu usuário"
                   autoComplete="username"
                 />
               </label>
@@ -1193,177 +1427,49 @@ function App() {
                   <p className="feedback feedback--error">{selectedOrderError}</p>
                 ) : null}
 
-                <section className="order-block">
-                  <div className="section-header">
-                    <div>
-                      <p className="eyebrow">Informacoes gerais</p>
-                    </div>
-                  </div>
+                <div className="order-actions-layout">
+                  <aside className="order-actions-sidebar">
+                    <button
+                      type="button"
+                      className={`order-actions-nav-button ${
+                        selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
+                      }`}
+                      onClick={() => setSelectedOrderSection('order')}
+                    >
+                      Pedido
+                    </button>
+                    <button
+                      type="button"
+                      className={`order-actions-nav-button ${
+                        selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
+                      }`}
+                      onClick={() => setSelectedOrderSection('comments')}
+                    >
+                      Comentarios
+                    </button>
+                    <button
+                      type="button"
+                      className={`order-actions-nav-button ${
+                        selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
+                      }`}
+                      onClick={() => setSelectedOrderSection('history')}
+                    >
+                      Histórico
+                    </button>
+                  </aside>
 
-                  <div className="order-general-grid">
-                    <label>
-                      <span>Solicitante</span>
-                      <input
-                        type="text"
-                        value={`${selectedOrder.requesterName} (@${selectedOrder.requesterUsername})`}
-                        readOnly
-                      />
-                    </label>
-
-                    <label>
-                      <span>Data da Solicitação</span>
-                      <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
-                    </label>
-
-                    <label>
-                      <span>OS</span>
-                      <input
-                        type="text"
-                        value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
-                        readOnly
-                      />
-                    </label>
-
-                    <label>
-                      <span>urgência</span>
-                      <input
-                        type="text"
-                        value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
-                        readOnly
-                      />
-                    </label>
-
-                    <label>
-                      <span>Status do pedido</span>
-                      <select
-                        value={selectedOrder.status}
-                        onChange={(event) =>
-                          updateSelectedOrderField('status', event.target.value)
-                        }
-                        disabled={!selectedOrderCanEdit}
-                      >
-                        {orderStatuses.map((status) => (
-                          <option key={status} value={status}>
-                            {formatOrderStatus(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      <span>Previsão de entrega</span>
-                      <input
-                        type="date"
-                        value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
-                        onChange={(event) =>
-                          updateSelectedOrderField('estimatedDelivery', event.target.value)
-                        }
-                        disabled={!selectedOrderCanEdit}
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    <span>Comentarios / Obs</span>
-                    <textarea
-                      value={selectedOrder.comments || ''}
-                      onChange={(event) =>
-                        updateSelectedOrderField('comments', event.target.value)
-                      }
-                      rows={4}
-                      disabled={!selectedOrderCanEdit}
+                  <div className="order-actions-content">
+                    <OrderDetailContent
+                      currentSection={selectedOrderSection}
+                      commentDraft={selectedOrderCommentDraft}
+                      selectedOrder={selectedOrder}
+                      selectedOrderCanEdit={selectedOrderCanEdit}
+                      updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
+                      updateSelectedOrderField={updateSelectedOrderField}
+                      updateSelectedOrderItem={updateSelectedOrderItem}
                     />
-                  </label>
-                </section>
-
-                <section className="order-block">
-                  <div className="section-header">
-                    <div>
-                      <p className="eyebrow">Itens solicitados</p>
-                    </div>
                   </div>
-
-                  <div className="order-items-table">
-                    <div className="order-items-table__head">
-                      <span>Produto</span>
-                      <span>Qtd</span>
-                      <span>Detalhes</span>
-                      <span>Obs</span>
-                      <span>Valor do produto</span>
-                      <span>Valor da venda</span>
-                      <span>Valor repassado</span>
-                    </div>
-
-                    <div className="order-items-table__body">
-                      {selectedOrder.items.map((item) => (
-                        <article key={item.id} className="order-item-row">
-                          <strong>{item.productName}</strong>
-                          <span>{item.quantity}</span>
-                          <button
-                            type="button"
-                            className="button button--ghost"
-                            onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
-                            disabled={!item.productLink}
-                          >
-                            Abrir link
-                          </button>
-                          <span>{item.notes || '-'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.productValue}
-                            onChange={(event) =>
-                              updateSelectedOrderItem(item.id, 'productValue', event.target.value)
-                            }
-                            disabled={!selectedOrderCanEdit}
-                          />
-                          <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.passedValue}
-                            onChange={(event) =>
-                              updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
-                            }
-                            disabled={!selectedOrderCanEdit}
-                          />
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="order-total">
-                    <span>Total do pedido</span>
-                    <strong>R$ {formatCurrencyValue(selectedOrder.total)}</strong>
-                  </div>
-                </section>
-
-                <section className="order-block">
-                  <div className="section-header">
-                    <div>
-                      <p className="eyebrow">Histórico de alteracoes</p>
-                    </div>
-                  </div>
-
-                  <div className="history-list">
-                    {selectedOrder.history?.length ? (
-                      selectedOrder.history.map((entry) => (
-                        <article key={entry.id} className="history-item">
-                          <div className="history-item__meta">
-                            <strong>{entry.name}</strong>
-                            <span>@{entry.username}</span>
-                            <span>{formatDateTime(entry.createdAt)}</span>
-                          </div>
-                          <p>{entry.description}</p>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="empty-state">Nenhuma alteracao registrada ainda.</p>
-                    )}
-                  </div>
-                </section>
+                </div>
 
                 {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
                 </form>
@@ -1524,177 +1630,49 @@ function App() {
                     <p className="feedback feedback--error">{selectedOrderError}</p>
                   ) : null}
 
-                  <section className="order-block">
-                    <div className="section-header">
-                      <div>
-                        <p className="eyebrow">Informacoes gerais</p>
-                      </div>
-                    </div>
-
-                    <div className="order-general-grid">
-                      <label>
-                        <span>Solicitante</span>
-                        <input
-                          type="text"
-                          value={`${selectedOrder.requesterName} (@${selectedOrder.requesterUsername})`}
-                          readOnly
-                        />
-                      </label>
-
-                      <label>
-                        <span>Data da Solicitação</span>
-                        <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
-                      </label>
-
-                      <label>
-                        <span>OS</span>
-                        <input
-                          type="text"
-                          value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
-                          readOnly
-                        />
-                      </label>
-
-                      <label>
-                        <span>urgência</span>
-                        <input
-                          type="text"
-                          value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
-                          readOnly
-                        />
-                      </label>
-
-                      <label>
-                        <span>Status do pedido</span>
-                      <select
-                        value={selectedOrder.status}
-                        onChange={(event) =>
-                          updateSelectedOrderField('status', event.target.value)
-                        }
-                        disabled={!selectedOrderCanEdit}
+                  <div className="order-actions-layout">
+                    <aside className="order-actions-sidebar">
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('order')}
                       >
-                          {orderStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {formatOrderStatus(status)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                        Pedido
+                      </button>
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('comments')}
+                      >
+                        Comentarios
+                      </button>
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('history')}
+                      >
+                        Histórico
+                      </button>
+                    </aside>
 
-                      <label>
-                        <span>Previsão de entrega</span>
-                      <input
-                        type="date"
-                        value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
-                        onChange={(event) =>
-                          updateSelectedOrderField('estimatedDelivery', event.target.value)
-                        }
-                        disabled={!selectedOrderCanEdit}
+                    <div className="order-actions-content">
+                      <OrderDetailContent
+                        currentSection={selectedOrderSection}
+                        commentDraft={selectedOrderCommentDraft}
+                        selectedOrder={selectedOrder}
+                        selectedOrderCanEdit={selectedOrderCanEdit}
+                        updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
+                        updateSelectedOrderField={updateSelectedOrderField}
+                        updateSelectedOrderItem={updateSelectedOrderItem}
                       />
-                      </label>
                     </div>
-
-                    <label>
-                      <span>Comentarios / Obs</span>
-                    <textarea
-                      value={selectedOrder.comments || ''}
-                      onChange={(event) =>
-                        updateSelectedOrderField('comments', event.target.value)
-                      }
-                      rows={4}
-                      disabled={!selectedOrderCanEdit}
-                    />
-                    </label>
-                  </section>
-
-                  <section className="order-block">
-                    <div className="section-header">
-                      <div>
-                        <p className="eyebrow">Itens solicitados</p>
-                      </div>
-                    </div>
-
-                    <div className="order-items-table">
-                      <div className="order-items-table__head">
-                        <span>Produto</span>
-                        <span>Qtd</span>
-                        <span>Detalhes</span>
-                        <span>Obs</span>
-                        <span>Valor do produto</span>
-                        <span>Valor da venda</span>
-                        <span>Valor repassado</span>
-                      </div>
-
-                      <div className="order-items-table__body">
-                        {selectedOrder.items.map((item) => (
-                          <article key={item.id} className="order-item-row">
-                            <strong>{item.productName}</strong>
-                            <span>{item.quantity}</span>
-                            <button
-                              type="button"
-                              className="button button--ghost"
-                              onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
-                              disabled={!item.productLink}
-                            >
-                              Abrir link
-                            </button>
-                            <span>{item.notes || '-'}</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.productValue}
-                              onChange={(event) =>
-                                updateSelectedOrderItem(item.id, 'productValue', event.target.value)
-                              }
-                              disabled={!selectedOrderCanEdit}
-                            />
-                            <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.passedValue}
-                              onChange={(event) =>
-                                updateSelectedOrderItem(item.id, 'passedValue', event.target.value)
-                              }
-                              disabled={!selectedOrderCanEdit}
-                            />
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="order-total">
-                      <span>Total do pedido</span>
-                      <strong>R$ {formatCurrencyValue(selectedOrder.total)}</strong>
-                    </div>
-                  </section>
-
-                  <section className="order-block">
-                    <div className="section-header">
-                      <div>
-                        <p className="eyebrow">Histórico de alteracoes</p>
-                      </div>
-                    </div>
-
-                    <div className="history-list">
-                      {selectedOrder.history?.length ? (
-                        selectedOrder.history.map((entry) => (
-                          <article key={entry.id} className="history-item">
-                            <div className="history-item__meta">
-                              <strong>{entry.name}</strong>
-                              <span>@{entry.username}</span>
-                              <span>{formatDateTime(entry.createdAt)}</span>
-                            </div>
-                            <p>{entry.description}</p>
-                          </article>
-                        ))
-                      ) : (
-                        <p className="empty-state">Nenhuma alteracao registrada ainda.</p>
-                      )}
-                    </div>
-                  </section>
+                  </div>
 
                   {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
                 </form>

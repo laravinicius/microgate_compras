@@ -595,6 +595,60 @@ input[readonly] {
   gap: 14px;
 }
 
+.order-actions-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.order-actions-sidebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  position: static;
+}
+
+.order-actions-content {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.order-actions-nav-button {
+  width: auto;
+  min-width: 140px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.order-actions-nav-button:hover {
+  transform: translateY(-1px);
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.order-actions-nav-button--active {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(147, 197, 253, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.16);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -632,6 +686,7 @@ input[readonly] {
   gap: 16px;
   padding: 20px;
   border-radius: 18px;
+  min-width: 0;
 }
 
 .order-general-grid {
@@ -643,9 +698,18 @@ input[readonly] {
 .orders-table__head,
 .order-row {
   display: grid;
-  grid-template-columns: 90px 200px minmax(180px, 0.9fr) minmax(220px, 1fr) 90px 110px 120px 120px;
+  grid-template-columns:
+    90px
+    minmax(180px, 1.2fr)
+    minmax(160px, 1fr)
+    minmax(180px, 1.2fr)
+    minmax(70px, 0.45fr)
+    minmax(100px, 0.75fr)
+    minmax(100px, 0.75fr)
+    minmax(110px, 0.8fr);
   gap: 12px;
   align-items: center;
+  width: 100%;
 }
 
 .order-items-table__head,
@@ -654,6 +718,11 @@ input[readonly] {
   grid-template-columns: minmax(180px, 1.2fr) 80px 120px minmax(160px, 1fr) 130px 130px 140px;
   gap: 12px;
   align-items: center;
+}
+
+.order-items-table {
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .orders-table__head,
@@ -709,6 +778,7 @@ input[readonly] {
   .form-grid--item-details,
   .form-grid--request-line,
   .order-general-grid,
+  .order-actions-layout,
   .orders-table__head,
   .order-row,
   .order-items-table__head,
