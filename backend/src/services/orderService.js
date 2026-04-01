@@ -57,6 +57,17 @@ function normalizeOrderHistory(row) {
   };
 }
 
+function normalizeOrderComment(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    username: row.username,
+    name: row.name,
+    comment: row.comment,
+    createdAt: row.created_at
+  };
+}
+
 async function insertOrderHistory(client, { orderId, userId, description }) {
   await client.query(
     `
@@ -64,6 +75,16 @@ async function insertOrderHistory(client, { orderId, userId, description }) {
       VALUES ($1, $2, $3)
     `,
     [orderId, userId, description]
+  );
+}
+
+async function insertOrderComment(client, { orderId, userId, comment }) {
+  await client.query(
+    `
+      INSERT INTO order_comments_history (order_id, user_id, comment)
+      VALUES ($1, $2, $3)
+    `,
+    [orderId, userId, comment]
   );
 }
 
@@ -202,14 +223,32 @@ async function getOrderById(orderId) {
     [orderId]
   );
 
+  const commentsHistoryResult = await pool.query(
+    `
+      SELECT
+        och.id,
+        och.order_id,
+        och.user_id,
+        och.comment,
+        och.created_at,
+        u.username,
+        u.name
+      FROM order_comments_history och
+      INNER JOIN users u ON u.id = och.user_id
+      WHERE och.order_id = $1
+      ORDER BY och.created_at DESC, och.id DESC
+    `,
+    [orderId]
+  );
+
   return {
     ...normalizeOrder({
       ...order,
       items_count: itemsResult.rowCount
     }),
-    items: itemsResult.rows.map(normalizeOrderItem)
-    ,
-    history: historyResult.rows.map(normalizeOrderHistory)
+    items: itemsResult.rows.map(normalizeOrderItem),
+    history: historyResult.rows.map(normalizeOrderHistory),
+    commentsHistory: commentsHistoryResult.rows.map(normalizeOrderComment)
   };
 }
 
@@ -360,7 +399,15 @@ async function updateOrder(orderId, { userId, status, estimatedDelivery, comment
     }
 
     if ((currentOrder.comments || '') !== (comments || '')) {
-      historyEntries.push('Comentarios atualizados.');
+      const normalizedComment = String(comments || '').trim();
+
+      if (normalizedComment) {
+        await insertOrderComment(client, {
+          orderId,
+          userId,
+          comment: normalizedComment
+        });
+      }
     }
 
     for (const item of items) {
