@@ -38,6 +38,14 @@ app.use((error, _request, response, _next) => {
     return;
   }
 
+  if (error?.code === '23503') {
+    response.status(409).json({
+      error:
+        'Operacao nao permitida porque existem registros relacionados a este item.'
+    });
+    return;
+  }
+
   response.status(500).json({
     error: 'Erro interno do servidor.'
   });

@@ -105,6 +105,13 @@ async function deleteUserHandler(request, response, next) {
   try {
     const userId = Number(request.params.id);
 
+    if (!Number.isInteger(userId) || userId <= 0) {
+      response.status(400).json({
+        error: 'ID de usuario invalido.'
+      });
+      return;
+    }
+
     if (request.user?.id === userId) {
       response.status(400).json({
         error: 'O administrador logado nao pode remover a propria conta.'
@@ -123,6 +130,14 @@ async function deleteUserHandler(request, response, next) {
 
     response.status(204).send();
   } catch (error) {
+    if (error?.code === '23503') {
+      response.status(409).json({
+        error:
+          'Nao e possivel remover este usuario porque ele possui pedidos ou historico associado.'
+      });
+      return;
+    }
+
     next(error);
   }
 }

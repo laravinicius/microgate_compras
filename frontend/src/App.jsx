@@ -18,10 +18,12 @@ const orderStatusLabels = {
   purchased: 'comprado',
   waiting_delivery: 'aguardando entrega',
   delivered: 'entregue',
+  email_pending: 'pendente email',
   cancelled: 'cancelado',
   pendente: 'pendente',
   comprado: 'comprado',
   'aguardando entrega': 'aguardando entrega',
+  'pendente email': 'pendente email',
   entregue: 'entregue',
   cancelado: 'cancelado'
 };
@@ -92,6 +94,18 @@ function normalizeDateInputValue(value) {
   }
 
   return String(value).slice(0, 10);
+}
+
+function getOrderIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const rawValue = params.get('orderId');
+  const orderId = Number(rawValue);
+
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return null;
+  }
+
+  return orderId;
 }
 
 async function parseApiResponse(response) {
@@ -433,6 +447,7 @@ function App() {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [formMessage, setFormMessage] = useState('');
   const [popup, setPopup] = useState(null);
+  const [linkedOrderId, setLinkedOrderId] = useState(() => getOrderIdFromUrl());
 
   const activeOrders = orders.filter((order) => !isFinishedStatus(order.status));
   const historicalOrders = orders.filter((order) => isFinishedStatus(order.status));
@@ -505,6 +520,19 @@ function App() {
 
     loadOrders(token, ordersFilters);
   }, [currentUser, token, ordersFilters]);
+
+  useEffect(() => {
+    if (!currentUser || !linkedOrderId) {
+      return;
+    }
+
+    openOrderActions(linkedOrderId);
+    setLinkedOrderId(null);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('orderId');
+    window.history.replaceState({}, '', nextUrl.toString());
+  }, [currentUser, linkedOrderId]);
 
   useEffect(() => {
     if (!ordersFilters.status) {

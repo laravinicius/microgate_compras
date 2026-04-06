@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { sendBuyerNotification } from '../utils/email.js';
 
 const statusAliases = {
   pendente: ['pendente', 'pending'],
@@ -10,7 +11,8 @@ const statusAliases = {
   entregue: ['entregue', 'delivered'],
   delivered: ['entregue', 'delivered'],
   cancelado: ['cancelado', 'cancelled'],
-  cancelled: ['cancelado', 'cancelled']
+  cancelled: ['cancelado', 'cancelled'],
+  email_pending: ['email_pending', 'pendente email']
 };
 
 function normalizeOrder(row) {
@@ -343,7 +345,76 @@ async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, w
 
     await client.query('COMMIT');
 
-    return getOrderById(order.id);
+    const fullOrder = await getOrderById(order.id);
+
+    // Disparo assíncrono para não bloquear a criação da ordem.
+    void (async () => {
+      if (!buyerId || !fullOrder) {
+        return;
+      }
+
+      try {
+        const buyerResult = await pool.query(
+          `
+            SELECT name, email
+            FROM users
+            WHERE id = $1
+          `,
+          [buyerId]
+        );
+
+        const buyer = buyerResult.rows[0];
+
+        // Sem email cadastrado: ignorar silenciosamente.
+        if (!buyer?.email) {
+          return;
+        }
+
+        const sent = await sendBuyerNotification({
+          buyerEmail: buyer.email,
+          buyerName: buyer.name,
+          orderId: fullOrder.id,
+          orderData: {
+            items: fullOrder.items,
+            total: fullOrder.total,
+            urgency,
+            requesterName: fullOrder.requesterName,
+            createdAt: fullOrder.createdAt
+          }
+        });
+
+        if (!sent) {
+          await pool.query(
+            `
+              UPDATE orders
+              SET status = 'email_pending'
+              WHERE id = $1
+            `,
+            [fullOrder.id]
+          );
+        }
+      } catch (emailError) {
+        console.error('[Email] Erro no fluxo de notificacao:', emailError);
+
+        try {
+          await pool.query(
+            `
+              UPDATE orders
+              SET status = 'email_pending'
+              WHERE id = $1
+            `,
+            [order.id]
+          );
+        } catch (statusError) {
+          console.error(
+            '[Email] Falha ao atualizar status para email_pending:',
+            statusError
+          );
+        }
+      }
+    })();
+
+    return fullOrder;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
