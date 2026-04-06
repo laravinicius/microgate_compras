@@ -65,6 +65,7 @@ function validateItems(items, allowPartial = false) {
 async function createOrderHandler(request, response, next) {
   try {
     const requestName = String(request.body?.requestName ?? '').trim();
+    const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
     const withoutOs = Boolean(request.body?.withoutOs);
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
@@ -73,6 +74,13 @@ async function createOrderHandler(request, response, next) {
     if (!requestName) {
       response.status(400).json({
         error: 'Informe o nome do pedido.'
+      });
+      return;
+    }
+
+    if (!buyerId) {
+      response.status(400).json({
+        error: 'Selecione um comprador.'
       });
       return;
     }
@@ -118,6 +126,7 @@ async function createOrderHandler(request, response, next) {
     const order = await createOrder({
       userId: request.user.id,
       requestName,
+      buyerId,
       urgency,
       relatedOs: withoutOs ? null : Number(relatedOsRaw),
       withoutOs,
@@ -167,10 +176,18 @@ async function getOrderDetailsHandler(request, response, next) {
 async function updateOrderHandler(request, response, next) {
   try {
     const orderId = Number(request.params.id);
+    const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const status = String(request.body?.status ?? '').trim().toLowerCase();
     const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
     const comments = String(request.body?.comments ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
+
+    if (!buyerId) {
+      response.status(400).json({
+        error: 'Selecione um comprador.'
+      });
+      return;
+    }
 
     if (!allowedStatuses.includes(status)) {
       response.status(400).json({
@@ -218,6 +235,7 @@ async function updateOrderHandler(request, response, next) {
 
     const order = await updateOrder(orderId, {
       userId: request.user.id,
+      buyerId,
       status,
       estimatedDelivery: estimatedDelivery || null,
       comments,

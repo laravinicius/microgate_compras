@@ -17,6 +17,9 @@ function normalizeOrder(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    buyerId: row.buyer_id,
+    buyerName: row.buyer_name,
+    buyerUsername: row.buyer_username,
     requesterName: row.requester_name,
     requesterUsername: row.requester_username,
     requestName: row.request_name,
@@ -116,6 +119,9 @@ async function listOrders(filters = {}) {
       SELECT
         o.id,
         o.user_id,
+        o.buyer_id,
+        b.name AS buyer_name,
+        b.username AS buyer_username,
         u.name AS requester_name,
         u.username AS requester_username,
         o.request_name,
@@ -131,11 +137,15 @@ async function listOrders(filters = {}) {
         COUNT(oi.id) AS items_count
       FROM orders o
       INNER JOIN users u ON u.id = o.user_id
+      LEFT JOIN users b ON b.id = o.buyer_id
       LEFT JOIN order_items oi ON oi.order_id = o.id
       ${whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''}
       GROUP BY
         o.id,
         o.user_id,
+        o.buyer_id,
+        b.name,
+        b.username,
         u.name,
         u.username,
         o.request_name,
@@ -162,6 +172,9 @@ async function getOrderById(orderId) {
       SELECT
         o.id,
         o.user_id,
+        o.buyer_id,
+        b.name AS buyer_name,
+        b.username AS buyer_username,
         u.name AS requester_name,
         u.username AS requester_username,
         o.request_name,
@@ -176,6 +189,7 @@ async function getOrderById(orderId) {
         o.updated_at
       FROM orders o
       INNER JOIN users u ON u.id = o.user_id
+      LEFT JOIN users b ON b.id = o.buyer_id
       WHERE o.id = $1
     `,
     [orderId]
@@ -252,7 +266,7 @@ async function getOrderById(orderId) {
   };
 }
 
-async function createOrder({ userId, requestName, urgency, relatedOs, withoutOs, items }) {
+async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, withoutOs, items }) {
   const client = await pool.connect();
 
   try {
@@ -264,6 +278,7 @@ async function createOrder({ userId, requestName, urgency, relatedOs, withoutOs,
       `
         INSERT INTO orders (
           user_id,
+          buyer_id,
           request_name,
           urgency,
           related_os,
@@ -271,10 +286,11 @@ async function createOrder({ userId, requestName, urgency, relatedOs, withoutOs,
           status,
           total
         )
-        VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
         RETURNING
           id,
           user_id,
+          buyer_id,
           request_name,
           urgency,
           related_os,
@@ -286,7 +302,7 @@ async function createOrder({ userId, requestName, urgency, relatedOs, withoutOs,
           created_at,
           updated_at
       `,
-      [userId, requestName, urgency, relatedOs, withoutOs, total]
+      [userId, buyerId, requestName, urgency, relatedOs, withoutOs, total]
     );
 
     const order = orderResult.rows[0];
@@ -336,7 +352,7 @@ async function createOrder({ userId, requestName, urgency, relatedOs, withoutOs,
   }
 }
 
-async function updateOrder(orderId, { userId, status, estimatedDelivery, comments, items }) {
+async function updateOrder(orderId, { userId, buyerId, status, estimatedDelivery, comments, items }) {
   const client = await pool.connect();
 
   try {
@@ -355,14 +371,15 @@ async function updateOrder(orderId, { userId, status, estimatedDelivery, comment
       `
         UPDATE orders
         SET
-          status = $2,
-          estimated_delivery = $3,
-          comments = $4,
-          total = $5
+          buyer_id = $2,
+          status = $3,
+          estimated_delivery = $4,
+          comments = $5,
+          total = $6
         WHERE id = $1
         RETURNING id
       `,
-      [orderId, status, estimatedDelivery, comments, total]
+      [orderId, buyerId, status, estimatedDelivery, comments, total]
     );
 
     if (!orderResult.rowCount) {
@@ -408,6 +425,10 @@ async function updateOrder(orderId, { userId, status, estimatedDelivery, comment
           comment: normalizedComment
         });
       }
+    }
+
+    if (Number(currentOrder.buyerId || 0) !== Number(buyerId || 0)) {
+      historyEntries.push('Comprador alterado.');
     }
 
     for (const item of items) {

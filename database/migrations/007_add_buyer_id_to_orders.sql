@@ -1,0 +1,2 @@
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS buyer_id INTEGER REFERENCES users (id);
