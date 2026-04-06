@@ -39,6 +39,7 @@ const emptyUserForm = {
   name: '',
   username: '',
   password: '',
+  email: '',
   role: 'solicitante'
 };
 
@@ -898,6 +899,7 @@ function App() {
           name: userForm.name,
           username: userForm.username,
           password: userForm.password,
+          email: userForm.email,
           role: userForm.role
         })
       });
@@ -926,6 +928,7 @@ function App() {
       name: user.name,
       username: user.username,
       password: '',
+      email: user.email || '',
       role: user.role
     });
   }
@@ -1829,6 +1832,16 @@ function App() {
                   value={userForm.password}
                   onChange={(event) => updateUserField('password', event.target.value)}
                   placeholder={userForm.id ? 'Nova senha opcional' : 'Senha inicial'}
+                />
+              </label>
+
+              <label>
+                <span>E-mail</span>
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) => updateUserField('email', event.target.value)}
+                  placeholder="usuario@example.com"
                 />
               </label>
 

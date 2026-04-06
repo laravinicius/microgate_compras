@@ -6,8 +6,14 @@ import {
 } from '../services/userService.js';
 
 const allowedRoles = ['administrador', 'comprador', 'solicitante'];
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function validateUserPayload({ name, username, password, role }, isEditing = false) {
+function validateEmail(email) {
+  if (!email) return ''; // Email é opcional
+  return emailRegex.test(email) ? '' : 'Email invalido.';
+}
+
+function validateUserPayload({ name, username, password, role, email }, isEditing = false) {
   if (!String(name ?? '').trim()) {
     return 'Informe o nome do usuario.';
   }
@@ -22,6 +28,11 @@ function validateUserPayload({ name, username, password, role }, isEditing = fal
 
   if (!allowedRoles.includes(role)) {
     return 'Perfil de usuario invalido.';
+  }
+
+  const emailError = validateEmail(email);
+  if (emailError) {
+    return emailError;
   }
 
   return '';
@@ -42,6 +53,7 @@ async function createUserHandler(request, response, next) {
       name: String(request.body?.name ?? '').trim(),
       username: String(request.body?.username ?? '').trim().toLowerCase(),
       password: String(request.body?.password ?? ''),
+      email: String(request.body?.email ?? '').trim().toLowerCase() || null,
       role: String(request.body?.role ?? 'solicitante').trim()
     };
     const validationError = validateUserPayload(payload);
@@ -64,6 +76,7 @@ async function updateUserHandler(request, response, next) {
       name: String(request.body?.name ?? '').trim(),
       username: String(request.body?.username ?? '').trim().toLowerCase(),
       password: String(request.body?.password ?? ''),
+      email: String(request.body?.email ?? '').trim().toLowerCase() || null,
       role: String(request.body?.role ?? 'solicitante').trim()
     };
     const validationError = validateUserPayload(payload, true);

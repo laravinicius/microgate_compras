@@ -6,6 +6,7 @@ function normalizeUser(row) {
     id: row.id,
     name: row.name,
     username: row.username,
+    email: row.email || null,
     role: row.role,
     createdAt: row.created_at
   };
@@ -14,7 +15,7 @@ function normalizeUser(row) {
 async function findUserByUsername(username) {
   const result = await query(
     `
-      SELECT id, name, username, role, password_hash, created_at
+      SELECT id, name, username, email, role, password_hash, created_at
       FROM users
       WHERE username = $1
     `,
@@ -27,7 +28,7 @@ async function findUserByUsername(username) {
 async function findUserById(id) {
   const result = await query(
     `
-      SELECT id, name, username, role, password_hash, created_at
+      SELECT id, name, username, email, role, password_hash, created_at
       FROM users
       WHERE id = $1
     `,
@@ -40,7 +41,7 @@ async function findUserById(id) {
 async function listUsers() {
   const result = await query(
     `
-      SELECT id, name, username, role, created_at
+      SELECT id, name, username, email, role, created_at
       FROM users
       ORDER BY created_at DESC, id DESC
     `
@@ -49,26 +50,26 @@ async function listUsers() {
   return result.rows.map(normalizeUser);
 }
 
-async function createUser({ name, username, password, role }) {
+async function createUser({ name, username, password, email, role }) {
   const result = await query(
     `
-      INSERT INTO users (name, username, password_hash, role)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, name, username, role, created_at
+      INSERT INTO users (name, username, password_hash, email, role)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, name, username, email, role, created_at
     `,
-    [name, username, hashPassword(password), role]
+    [name, username, hashPassword(password), email, role]
   );
 
   return normalizeUser(result.rows[0]);
 }
 
-async function updateUser(id, { name, username, password, role }) {
-  const values = [id, name, username, role];
+async function updateUser(id, { name, username, password, email, role }) {
+  const values = [id, name, username, email, role];
   let passwordFragment = '';
 
   if (password) {
     values.push(hashPassword(password));
-    passwordFragment = ', password_hash = $5';
+    passwordFragment = ', password_hash = $6';
   }
 
   const result = await query(
@@ -77,10 +78,11 @@ async function updateUser(id, { name, username, password, role }) {
       SET
         name = $2,
         username = $3,
-        role = $4
+        email = $4,
+        role = $5
         ${passwordFragment}
       WHERE id = $1
-      RETURNING id, name, username, role, created_at
+      RETURNING id, name, username, email, role, created_at
     `,
     values
   );
