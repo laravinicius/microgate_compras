@@ -552,6 +552,10 @@ input[readonly] {
   align-items: end;
 }
 
+.item-card .form-grid + .form-grid {
+  margin-top: 8px;
+}
+
 .checkbox-field {
   display: flex;
   gap: 10px;

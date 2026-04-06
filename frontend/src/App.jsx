@@ -977,6 +977,8 @@ function App() {
     setOrderActionMessage('');
 
     try {
+      const commentToSave = selectedOrderCommentDraft || selectedOrder.comments || '';
+
       const response = await fetch(`${apiBaseUrl}/orders/${selectedOrder.id}`, {
         method: 'PUT',
         headers: {
@@ -986,7 +988,7 @@ function App() {
         body: JSON.stringify({
           status: selectedOrder.status,
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
-          comments: selectedOrderCommentDraft || '',
+          comments: commentToSave,
           items: selectedOrder.items.map((item) => ({
             id: item.id,
             productValue: Number(item.productValue || 0),
@@ -1002,12 +1004,12 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
-        comments: selectedOrderCommentDraft,
+        comments: commentToSave,
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
         commentsHistory: data.order.commentsHistory || []
       });
-      setSelectedOrderCommentDraft(selectedOrderCommentDraft);
+      setSelectedOrderCommentDraft('');
       setOrderActionMessage('Pedido atualizado com sucesso.');
       setPopup({
         type: 'success',
