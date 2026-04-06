@@ -54,6 +54,7 @@ const createEmptyRequestItem = () => ({
 
 const createEmptyRequestForm = () => ({
   requestName: '',
+  buyerId: null,
   urgency: 'normal',
   relatedOs: '',
   withoutOs: false,
@@ -91,6 +92,17 @@ function normalizeDateInputValue(value) {
   }
 
   return String(value).slice(0, 10);
+}
+
+async function parseApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const rawText = await response.text();
+  return { rawText };
 }
 
 function formatOrderStatus(status) {
@@ -179,6 +191,7 @@ function OrderDetailContent({
   commentDraft,
   selectedOrder,
   selectedOrderCanEdit,
+  users,
   updateSelectedOrderCommentDraft,
   updateSelectedOrderField,
   updateSelectedOrderItem
@@ -278,6 +291,26 @@ function OrderDetailContent({
                   {formatOrderStatus(status)}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Comprador</span>
+            <select
+              value={selectedOrder.buyerId || ''}
+              onChange={(event) =>
+                updateSelectedOrderField('buyerId', Number(event.target.value) || null)
+              }
+              disabled={!selectedOrderCanEdit}
+            >
+              <option value="">Selecione um comprador</option>
+              {users
+                .filter((user) => normalizeRole(user.role) === 'comprador')
+                .map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
             </select>
           </label>
 
@@ -796,10 +829,16 @@ function App() {
         },
         body: JSON.stringify(loginForm)
       });
-      const data = await response.json();
+      const data = await parseApiResponse(response);
 
       if (!response.ok) {
         throw new Error(data.error || 'Falha ao autenticar.');
+      }
+
+      if (!data?.token || !data?.user) {
+        throw new Error(
+          'Resposta inesperada da API. Verifique se o endpoint /api/auth/login esta configurado no servidor.'
+        );
       }
 
       localStorage.setItem(tokenStorageKey, data.token);
@@ -833,6 +872,18 @@ function App() {
     setIsSubmittingRequest(true);
     setRequestMessage('');
 
+    if (!requestForm.requestName.trim()) {
+      setRequestMessage('Informe o nome do pedido.');
+      setIsSubmittingRequest(false);
+      return;
+    }
+
+    if (!requestForm.buyerId) {
+      setRequestMessage('Selecione um comprador.');
+      setIsSubmittingRequest(false);
+      return;
+    }
+
     try {
       const response = await fetch(`${apiBaseUrl}/orders`, {
         method: 'POST',
@@ -842,6 +893,7 @@ function App() {
         },
         body: JSON.stringify({
           requestName: requestForm.requestName,
+          buyerId: requestForm.buyerId,
           urgency: requestForm.urgency,
           relatedOs: requestForm.relatedOs,
           withoutOs: requestForm.withoutOs,
@@ -989,6 +1041,7 @@ function App() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
+          buyerId: selectedOrder.buyerId,
           status: selectedOrder.status,
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
           comments: commentToSave,
@@ -1222,6 +1275,23 @@ function App() {
                     onChange={(event) => updateRequestField('requestName', event.target.value)}
                     placeholder="Ex.: Compra de insumos para bancada"
                   />
+                </label>
+
+                <label>
+                  <span>Comprador *</span>
+                  <select
+                    value={requestForm.buyerId || ''}
+                    onChange={(event) => updateRequestField('buyerId', Number(event.target.value) || null)}
+                  >
+                    <option value="">Selecione um comprador</option>
+                    {users
+                      .filter((user) => normalizeRole(user.role) === 'comprador')
+                      .map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                  </select>
                 </label>
 
                 <label>
@@ -1469,6 +1539,7 @@ function App() {
                       commentDraft={selectedOrderCommentDraft}
                       selectedOrder={selectedOrder}
                       selectedOrderCanEdit={selectedOrderCanEdit}
+                      users={users}
                       updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                       updateSelectedOrderField={updateSelectedOrderField}
                       updateSelectedOrderItem={updateSelectedOrderItem}
@@ -1542,6 +1613,7 @@ function App() {
                       <span>ID</span>
                       <span>Última atualização</span>
                       <span>Solicitante</span>
+                      <span>Comprador</span>
                       <span>Descrição</span>
                       <span>Itens</span>
                       <span>urgência</span>
@@ -1558,6 +1630,7 @@ function App() {
                             <strong>#{order.id}</strong>
                             <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
                             <span>{order.requesterName || order.requesterUsername || '-'}</span>
+                            <span>{order.buyerName || order.buyerUsername || '-'}</span>
                             <span>{order.requestName || '-'}</span>
                             <span>{order.itemsCount}</span>
                             <span
@@ -1672,6 +1745,7 @@ function App() {
                         commentDraft={selectedOrderCommentDraft}
                         selectedOrder={selectedOrder}
                         selectedOrderCanEdit={selectedOrderCanEdit}
+                        users={users}
                         updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                         updateSelectedOrderField={updateSelectedOrderField}
                         updateSelectedOrderItem={updateSelectedOrderItem}
@@ -1745,6 +1819,7 @@ function App() {
                         <span>ID</span>
                         <span>Última atualização</span>
                         <span>Solicitante</span>
+                        <span>Comprador</span>
                         <span>Descrição</span>
                         <span>Itens</span>
                         <span>urgência</span>
@@ -1761,6 +1836,7 @@ function App() {
                               <strong>#{order.id}</strong>
                               <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
                               <span>{order.requesterName || order.requesterUsername || '-'}</span>
+                              <span>{order.buyerName || order.buyerUsername || '-'}</span>
                               <span>{order.requestName || '-'}</span>
                               <span>{order.itemsCount}</span>
                               <span
