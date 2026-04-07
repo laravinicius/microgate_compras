@@ -561,6 +561,14 @@ input[readonly] {
   align-items: end;
 }
 
+.checkbox-field--request-os {
+  grid-column: 4;
+  justify-self: start;
+  width: fit-content;
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
+
 .form-grid--values {
   grid-template-columns: 110px 1fr 1fr;
 }
@@ -615,6 +623,9 @@ input[readonly] {
 
 .order-actions__top-buttons {
   gap: 14px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 8px;
 }
 
 .order-actions-layout {
@@ -774,6 +785,15 @@ input[readonly] {
   border-radius: 16px;
 }
 
+.order-row--clickable {
+  cursor: pointer;
+}
+
+.order-row--clickable:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.85);
+  outline-offset: 2px;
+}
+
 .orders-table__body,
 .order-items-table__body {
   display: grid;
@@ -835,7 +855,6 @@ input[readonly] {
   }
 
   .section-header,
-  .order-actions__top-buttons,
   .user-card,
   .items-header,
   .item-card__header,

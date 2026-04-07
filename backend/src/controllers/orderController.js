@@ -13,11 +13,20 @@ import {
 
 const allowedStatuses = [
   'pendente',
+  'comprado/aguardando entrega',
   'comprado',
   'aguardando entrega',
   'entregue',
   'cancelado'
 ];
+
+function normalizeStatus(status) {
+  if (status === 'comprado' || status === 'aguardando entrega') {
+    return 'comprado/aguardando entrega';
+  }
+
+  return status;
+}
 
 function toCurrencyNumber(value) {
   const normalizedValue = Number(value);
@@ -190,7 +199,7 @@ async function updateOrderHandler(request, response, next) {
   try {
     const orderId = Number(request.params.id);
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
-    const status = String(request.body?.status ?? '').trim().toLowerCase();
+    const status = normalizeStatus(String(request.body?.status ?? '').trim().toLowerCase());
     const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
     const comments = String(request.body?.comments ?? '').trim();
     const compraParaguaiRaw = request.body?.compraParaguai;

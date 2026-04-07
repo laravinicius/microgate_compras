@@ -3,30 +3,43 @@ import microgateLogo from './assets/microgate2.png';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
+const mergedPurchasedStatus = 'comprado/aguardando entrega';
 const orderStatuses = [
   'pendente',
-  'comprado',
-  'aguardando entrega',
+  mergedPurchasedStatus,
   'entregue',
   'cancelado'
 ];
-const panelFilterStatuses = ['pendente', 'comprado', 'aguardando entrega'];
+const panelFilterStatuses = ['pendente', mergedPurchasedStatus];
 const historyFilterStatuses = ['entregue', 'cancelado'];
 
 const orderStatusLabels = {
   pending: 'pendente',
-  purchased: 'comprado',
-  waiting_delivery: 'aguardando entrega',
+  purchased: mergedPurchasedStatus,
+  waiting_delivery: mergedPurchasedStatus,
   delivered: 'entregue',
   email_pending: 'pendente email',
   cancelled: 'cancelado',
   pendente: 'pendente',
-  comprado: 'comprado',
-  'aguardando entrega': 'aguardando entrega',
+  comprado: mergedPurchasedStatus,
+  'aguardando entrega': mergedPurchasedStatus,
+  'comprado/aguardando entrega': mergedPurchasedStatus,
   'pendente email': 'pendente email',
   entregue: 'entregue',
   cancelado: 'cancelado'
 };
+
+function normalizeOrderStatus(status) {
+  if (status === 'comprado' || status === 'purchased') {
+    return mergedPurchasedStatus;
+  }
+
+  if (status === 'aguardando entrega' || status === 'waiting_delivery') {
+    return mergedPurchasedStatus;
+  }
+
+  return status;
+}
 
 const roleLabels = {
   admin: 'Administrador',
@@ -763,7 +776,7 @@ function App() {
       }
 
       const data = await response.json();
-      setOrders(data.orders);
+      setOrders(data.orders.map((order) => ({ ...order, status: normalizeOrderStatus(order.status) })));
     } catch (error) {
       setOrdersError(error.message);
     } finally {
@@ -790,6 +803,7 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
+        status: normalizeOrderStatus(data.order.status),
         compraParaguai: Boolean(data.order.compraParaguai),
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
@@ -879,6 +893,15 @@ function App() {
     setActiveTab('panel');
     setSelectedOrderSection('order');
     loadOrderDetails(orderId);
+  }
+
+  function handleOrderRowKeyDown(event, orderId) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    openOrderActions(orderId);
   }
 
   function closeOrderActions() {
@@ -1325,6 +1348,7 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
+        status: normalizeOrderStatus(data.order.status),
         comments: commentToSave,
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
@@ -1611,7 +1635,7 @@ function App() {
                   />
                 </label>
 
-                <label className="checkbox-field checkbox-field--inline-row">
+                <label className="checkbox-field checkbox-field--inline-row checkbox-field--request-os">
                   <input
                     type="checkbox"
                     checked={requestForm.withoutOs}
@@ -1625,6 +1649,7 @@ function App() {
                   />
                   <span>Sem OS</span>
                 </label>
+              </div>
 
                 <label className="checkbox-field checkbox-field--inline-row">
                   <input
@@ -1645,7 +1670,6 @@ function App() {
                   />
                   <span>Compra Paraguai</span>
                 </label>
-              </div>
 
                 <div className="items-header">
                   <div>
@@ -1776,35 +1800,6 @@ function App() {
                         Acompanhe status, valores e Histórico desta Solicitação.
                       </p>
                     </div>
-
-                    <div className="order-actions__top-buttons">
-                      {selectedOrderCanEdit ? (
-                        <button
-                          type="submit"
-                          className="button button--green"
-                          disabled={isSavingSelectedOrder}
-                        >
-                          {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        onClick={closeOrderActions}
-                      >
-                        Voltar
-                      </button>
-                      {selectedOrderCanDelete ? (
-                        <button
-                          type="button"
-                          className="button button--danger"
-                          onClick={handleDeleteSelectedOrder}
-                          disabled={isDeletingSelectedOrder}
-                        >
-                          {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
-                        </button>
-                      ) : null}
-                    </div>
                   </div>
 
                 {selectedOrderError ? (
@@ -1857,6 +1852,35 @@ function App() {
                 </div>
 
                 {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
+
+                <div className="order-actions__top-buttons">
+                  {selectedOrderCanEdit ? (
+                    <button
+                      type="submit"
+                      className="button button--green"
+                      disabled={isSavingSelectedOrder}
+                    >
+                      {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={closeOrderActions}
+                  >
+                    Voltar
+                  </button>
+                  {selectedOrderCanDelete ? (
+                    <button
+                      type="button"
+                      className="button button--danger"
+                      onClick={handleDeleteSelectedOrder}
+                      disabled={isDeletingSelectedOrder}
+                    >
+                      {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                    </button>
+                  ) : null}
+                </div>
                 </form>
               ) : (
                 <>
@@ -1927,7 +1951,6 @@ function App() {
                       <span>Itens</span>
                       <span>urgência</span>
                       <span>Status</span>
-                      <span>Ações</span>
                     </div>
 
                     <div className="orders-table__body">
@@ -1935,7 +1958,15 @@ function App() {
                         <p className="empty-state">Nenhuma requisicao ativa encontrada.</p>
                       ) : (
                         activeOrders.map((order) => (
-                          <article key={order.id} className="order-row">
+                          <article
+                            key={order.id}
+                            className="order-row order-row--clickable"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openOrderActions(order.id)}
+                            onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
+                            aria-label={`Abrir requisição ${order.id}`}
+                          >
                             <strong>#{order.id}</strong>
                             <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
                             <span>{order.requesterName || order.requesterUsername || '-'}</span>
@@ -1950,13 +1981,6 @@ function App() {
                               {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
                             </span>
                             <span className="status-chip">{formatOrderStatus(order.status)}</span>
-                            <button
-                              type="button"
-                              className="button button--blue"
-                              onClick={() => openOrderActions(order.id)}
-                            >
-                              Ações
-                            </button>
                           </article>
                         ))
                       )}
@@ -1981,35 +2005,6 @@ function App() {
                       <p className="description">
                         Requisições entregues sao consideradas finalizadas e ficam arquivadas aqui.
                       </p>
-                    </div>
-
-                    <div className="order-actions__top-buttons">
-                      {selectedOrderCanEdit ? (
-                        <button
-                          type="submit"
-                          className="button button--green"
-                          disabled={isSavingSelectedOrder}
-                        >
-                          {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        onClick={closeOrderActions}
-                      >
-                        Voltar
-                      </button>
-                      {selectedOrderCanDelete ? (
-                        <button
-                          type="button"
-                          className="button button--danger"
-                          onClick={handleDeleteSelectedOrder}
-                          disabled={isDeletingSelectedOrder}
-                        >
-                          {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
 
@@ -2063,6 +2058,35 @@ function App() {
                   </div>
 
                   {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
+
+                  <div className="order-actions__top-buttons">
+                    {selectedOrderCanEdit ? (
+                      <button
+                        type="submit"
+                        className="button button--green"
+                        disabled={isSavingSelectedOrder}
+                      >
+                        {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={closeOrderActions}
+                    >
+                      Voltar
+                    </button>
+                    {selectedOrderCanDelete ? (
+                      <button
+                        type="button"
+                        className="button button--danger"
+                        onClick={handleDeleteSelectedOrder}
+                        disabled={isDeletingSelectedOrder}
+                      >
+                        {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                      </button>
+                    ) : null}
+                  </div>
                 </form>
               ) : (
                 <>
@@ -2133,7 +2157,6 @@ function App() {
                         <span>Itens</span>
                         <span>urgência</span>
                         <span>Status</span>
-                        <span>Ações</span>
                       </div>
 
                       <div className="orders-table__body">
@@ -2141,7 +2164,15 @@ function App() {
                           <p className="empty-state">Nenhuma requisicao finalizada encontrada.</p>
                         ) : (
                           historicalOrders.map((order) => (
-                            <article key={order.id} className="order-row">
+                            <article
+                              key={order.id}
+                              className="order-row order-row--clickable"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openOrderActions(order.id)}
+                              onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
+                              aria-label={`Abrir requisição ${order.id}`}
+                            >
                               <strong>#{order.id}</strong>
                               <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
                               <span>{order.requesterName || order.requesterUsername || '-'}</span>
@@ -2156,13 +2187,6 @@ function App() {
                                 {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
                               </span>
                               <span className="status-chip">{formatOrderStatus(order.status)}</span>
-                              <button
-                                type="button"
-                                className="button button--blue"
-                                onClick={() => openOrderActions(order.id)}
-                              >
-                                Ações
-                              </button>
                             </article>
                           ))
                         )}

@@ -4,10 +4,41 @@ import { sendBuyerNotification } from '../utils/email.js';
 const statusAliases = {
   pendente: ['pendente', 'pending'],
   pending: ['pendente', 'pending'],
-  comprado: ['comprado', 'purchased'],
-  purchased: ['comprado', 'purchased'],
-  'aguardando entrega': ['aguardando entrega', 'waiting_delivery'],
-  waiting_delivery: ['aguardando entrega', 'waiting_delivery'],
+  'comprado/aguardando entrega': [
+    'comprado/aguardando entrega',
+    'comprado',
+    'purchased',
+    'aguardando entrega',
+    'waiting_delivery'
+  ],
+  comprado: [
+    'comprado/aguardando entrega',
+    'comprado',
+    'purchased',
+    'aguardando entrega',
+    'waiting_delivery'
+  ],
+  purchased: [
+    'comprado/aguardando entrega',
+    'comprado',
+    'purchased',
+    'aguardando entrega',
+    'waiting_delivery'
+  ],
+  'aguardando entrega': [
+    'comprado/aguardando entrega',
+    'comprado',
+    'purchased',
+    'aguardando entrega',
+    'waiting_delivery'
+  ],
+  waiting_delivery: [
+    'comprado/aguardando entrega',
+    'comprado',
+    'purchased',
+    'aguardando entrega',
+    'waiting_delivery'
+  ],
   entregue: ['entregue', 'delivered'],
   delivered: ['entregue', 'delivered'],
   cancelado: ['cancelado', 'cancelled'],
