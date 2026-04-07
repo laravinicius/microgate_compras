@@ -60,6 +60,7 @@ const createEmptyRequestForm = () => ({
   urgency: 'normal',
   relatedOs: '',
   withoutOs: false,
+  compraParaguai: false,
   items: [createEmptyRequestItem()]
 });
 
@@ -78,6 +79,23 @@ function formatCurrencyValue(value) {
   }
 
   return numericValue.toFixed(2);
+}
+
+function getBaseSaleMultiplier(productValue) {
+  return Number(productValue) < 1000 ? 1.7 : 1.6;
+}
+
+function calculateSaleValue(productValue, compraParaguai = false) {
+  const normalizedProductValue = Number(productValue);
+
+  if (!Number.isFinite(normalizedProductValue)) {
+    return 0;
+  }
+
+  const baseMultiplier = getBaseSaleMultiplier(normalizedProductValue);
+  const finalMultiplier = compraParaguai ? baseMultiplier * 1.25 : baseMultiplier;
+
+  return Number(formatCurrencyValue(normalizedProductValue * finalMultiplier));
 }
 
 function formatDateTime(value) {
@@ -317,7 +335,7 @@ function OrderDetailContent({
               }
               disabled={!selectedOrderCanEdit}
             >
-              <option value="">Selecione um comprador</option>
+              <option value="">Selecione</option>
               {users
                 .filter((user) => normalizeRole(user.role) === 'comprador')
                 .map((user) => (
@@ -471,6 +489,7 @@ function App() {
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
     (!requestForm.withoutOs && Boolean(requestForm.relatedOs.trim())) ||
+    requestForm.compraParaguai ||
     requestForm.items.some(
       (item) =>
         item.productName.trim() ||
@@ -698,7 +717,10 @@ function App() {
         };
 
         if (field === 'productValue') {
-          updatedItem.saleValue = Number(formatCurrencyValue(Number(value || 0) * 1.7));
+          updatedItem.saleValue = calculateSaleValue(
+            Number(value || 0),
+            Boolean(current.compraParaguai)
+          );
         }
 
         return updatedItem;
@@ -794,7 +816,9 @@ function App() {
         };
 
         if (field === 'productValue') {
-          updatedItem.saleValue = formatCurrencyValue(Number(value || 0) * 1.7);
+          updatedItem.saleValue = formatCurrencyValue(
+            calculateSaleValue(Number(value || 0), Boolean(current.compraParaguai))
+          );
         }
 
         if (field === 'quantity') {
@@ -925,6 +949,7 @@ function App() {
           urgency: requestForm.urgency,
           relatedOs: requestForm.relatedOs,
           withoutOs: requestForm.withoutOs,
+          compraParaguai: requestForm.compraParaguai,
           items: requestForm.items.map((item) => ({
             productName: item.productName,
             productLink: item.productLink,
@@ -1306,12 +1331,12 @@ function App() {
                 </label>
 
                 <label>
-                  <span>Comprador *</span>
+                  <span>Comprador</span>
                   <select
                     value={requestForm.buyerId || ''}
                     onChange={(event) => updateRequestField('buyerId', Number(event.target.value) || null)}
                   >
-                    <option value="">Selecione um comprador</option>
+                    <option value="">Selecione</option>
                     {users
                       .filter((user) => normalizeRole(user.role) === 'comprador')
                       .map((user) => (
@@ -1363,6 +1388,26 @@ function App() {
                     }
                   />
                   <span>Sem OS</span>
+                </label>
+
+                <label className="checkbox-field checkbox-field--inline-row">
+                  <input
+                    type="checkbox"
+                    checked={requestForm.compraParaguai}
+                    onChange={(event) =>
+                      setRequestForm((current) => ({
+                        ...current,
+                        compraParaguai: event.target.checked,
+                        items: current.items.map((item) => ({
+                          ...item,
+                          saleValue: formatCurrencyValue(
+                            calculateSaleValue(Number(item.productValue || 0), event.target.checked)
+                          )
+                        }))
+                      }))
+                    }
+                  />
+                  <span>Compra Paraguai</span>
                 </label>
               </div>
 

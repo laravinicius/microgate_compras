@@ -29,6 +29,17 @@ function toCurrencyNumber(value) {
   return Number(normalizedValue.toFixed(2));
 }
 
+function getBaseSaleMultiplier(productValue) {
+  return Number(productValue) < 1000 ? 1.7 : 1.6;
+}
+
+function calculateSaleValue(productValue, compraParaguai = false) {
+  const baseMultiplier = getBaseSaleMultiplier(productValue);
+  const finalMultiplier = compraParaguai ? baseMultiplier * 1.25 : baseMultiplier;
+
+  return toCurrencyNumber(Number(productValue) * finalMultiplier);
+}
+
 function validateItems(items, allowPartial = false) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'Adicione ao menos um item na Solicitação.';
@@ -68,6 +79,7 @@ async function createOrderHandler(request, response, next) {
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
     const withoutOs = Boolean(request.body?.withoutOs);
+    const compraParaguai = Boolean(request.body?.compraParaguai);
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
 
@@ -110,7 +122,7 @@ async function createOrderHandler(request, response, next) {
 
     const normalizedItems = items.map((item) => {
       const productValue = toCurrencyNumber(item.productValue);
-      const saleValue = toCurrencyNumber(Number(item.productValue) * 1.7);
+      const saleValue = calculateSaleValue(productValue, compraParaguai);
 
       return {
         productName: String(item.productName ?? '').trim(),
@@ -130,6 +142,7 @@ async function createOrderHandler(request, response, next) {
       urgency,
       relatedOs: withoutOs ? null : Number(relatedOsRaw),
       withoutOs,
+      compraParaguai,
       items: normalizedItems
     });
 
@@ -205,13 +218,6 @@ async function updateOrderHandler(request, response, next) {
       return;
     }
 
-    const normalizedItems = items.map((item) => ({
-      id: Number(item.id),
-      productValue: toCurrencyNumber(item.productValue),
-      saleValue: toCurrencyNumber(Number(item.productValue) * 1.7),
-      passedValue: toCurrencyNumber(item.passedValue)
-    }));
-
     const currentOrder = await getOrderById(orderId);
 
     if (!currentOrder) {
@@ -220,6 +226,17 @@ async function updateOrderHandler(request, response, next) {
       });
       return;
     }
+
+    const normalizedItems = items.map((item) => {
+      const productValue = toCurrencyNumber(item.productValue);
+
+      return {
+        id: Number(item.id),
+        productValue,
+        saleValue: calculateSaleValue(productValue, Boolean(currentOrder.compraParaguai)),
+        passedValue: toCurrencyNumber(item.passedValue)
+      };
+    });
 
     const canUpdateOrder =
       isAdministrator(request.user) ||

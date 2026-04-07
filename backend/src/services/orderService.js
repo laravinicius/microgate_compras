@@ -28,6 +28,7 @@ function normalizeOrder(row) {
     urgency: row.urgency,
     relatedOs: row.related_os,
     withoutOs: row.without_os,
+    compraParaguai: Boolean(row.compra_paraguai),
     status: row.status,
     estimatedDelivery: row.estimated_delivery,
     comments: row.comments ?? '',
@@ -130,6 +131,7 @@ async function listOrders(filters = {}) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.compra_paraguai,
         o.status,
         o.estimated_delivery,
         o.comments,
@@ -154,6 +156,7 @@ async function listOrders(filters = {}) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.compra_paraguai,
         o.status,
         o.estimated_delivery,
         o.comments,
@@ -183,6 +186,7 @@ async function getOrderById(orderId) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.compra_paraguai,
         o.status,
         o.estimated_delivery,
         o.comments,
@@ -268,7 +272,16 @@ async function getOrderById(orderId) {
   };
 }
 
-async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, withoutOs, items }) {
+async function createOrder({
+  userId,
+  buyerId,
+  requestName,
+  urgency,
+  relatedOs,
+  withoutOs,
+  compraParaguai,
+  items
+}) {
   const client = await pool.connect();
 
   try {
@@ -285,10 +298,11 @@ async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, w
           urgency,
           related_os,
           without_os,
+          compra_paraguai,
           status,
           total
         )
-        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
         RETURNING
           id,
           user_id,
@@ -297,6 +311,7 @@ async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, w
           urgency,
           related_os,
           without_os,
+          compra_paraguai,
           status,
           estimated_delivery,
           comments,
@@ -304,7 +319,16 @@ async function createOrder({ userId, buyerId, requestName, urgency, relatedOs, w
           created_at,
           updated_at
       `,
-      [userId, buyerId, requestName, urgency, relatedOs, withoutOs, total]
+      [
+        userId,
+        buyerId,
+        requestName,
+        urgency,
+        relatedOs,
+        withoutOs,
+        Boolean(compraParaguai),
+        total
+      ]
     );
 
     const order = orderResult.rows[0];

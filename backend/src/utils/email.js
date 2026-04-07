@@ -74,17 +74,17 @@ export async function sendBuyerNotification({
           <style>
             body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #0f4c75; color: #fff; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+            .header { background-color: #1f1f1f; color: #fff; padding: 20px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #3a3a3a; }
             .header h1 { margin: 0; font-size: 22px; }
             .content { background-color: #f7f9fb; padding: 20px; border-radius: 6px; }
             .section { margin-bottom: 20px; }
-            .section h2 { font-size: 18px; color: #0f4c75; border-bottom: 2px solid #bbe1fa; padding-bottom: 8px; }
+            .section h2 { font-size: 18px; color: #1f1f1f; border-bottom: 2px solid #4b5563; padding-bottom: 8px; }
             table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th { background-color: #3282b8; color: #fff; padding: 10px; text-align: left; }
-            .total-row { background-color: #e8f4fb; font-weight: 700; }
+            th { background-color: #4b5563; color: #fff; padding: 10px; text-align: left; }
+            .total-row { background-color: #e5e7eb; font-weight: 700; }
             .total-row td { border: 1px solid #ddd; padding: 10px; }
             .button-wrap { text-align: center; margin-top: 20px; }
-            .button { display: inline-block; background-color: #3282b8; color: #fff !important; padding: 12px 22px; border-radius: 6px; text-decoration: none; }
+            .button { display: inline-block; background-color: #4b5563; color: #fff !important; padding: 12px 22px; border-radius: 6px; text-decoration: none; }
             .footer { font-size: 12px; text-align: center; color: #666; margin-top: 20px; }
           </style>
         </head>
@@ -97,7 +97,7 @@ export async function sendBuyerNotification({
             <div class="content">
               <div class="section">
                 <p>Olá <strong>${escapeHtml(buyerName || 'Comprador')}</strong>,</p>
-                <p>Sua ordem foi criada com sucesso. Confira o resumo abaixo:</p>
+                <p>Ordem criada para você. Confira o resumo abaixo:</p>
               </div>
 
               <div class="section">
