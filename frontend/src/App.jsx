@@ -78,7 +78,6 @@ const createEmptyRequestForm = () => ({
   buyerId: null,
   urgency: 'normal',
   relatedOs: '',
-  withoutOs: false,
   compraParaguai: false,
   items: [createEmptyRequestItem()]
 });
@@ -145,6 +144,14 @@ function normalizeDateInputValue(value) {
   }
 
   return String(value).slice(0, 10);
+}
+
+function openDatePickerOnFieldClick(event) {
+  const input = event.currentTarget;
+
+  if (typeof input.showPicker === 'function') {
+    input.showPicker();
+  }
 }
 
 function getOrderIdFromUrl() {
@@ -261,6 +268,8 @@ function OrderDetailContent({
   updateSelectedOrderField,
   updateSelectedOrderItem
 }) {
+  const relatedOsValue = String(selectedOrder.relatedOs ?? '');
+
   if (currentSection === 'comments') {
     return (
       <>
@@ -330,8 +339,10 @@ function OrderDetailContent({
             <span>OS</span>
             <input
               type="text"
-              value={selectedOrder.withoutOs ? 'Sem OS' : selectedOrder.relatedOs || '-'}
-              readOnly
+              value={relatedOsValue}
+              onChange={(event) => updateSelectedOrderField('relatedOs', event.target.value)}
+              placeholder="Numero da OS"
+              disabled={!selectedOrderCanEdit}
             />
           </label>
 
@@ -384,6 +395,7 @@ function OrderDetailContent({
             <input
               type="date"
               value={normalizeDateInputValue(selectedOrder.estimatedDelivery)}
+              onClick={openDatePickerOnFieldClick}
               onChange={(event) =>
                 updateSelectedOrderField('estimatedDelivery', event.target.value)
               }
@@ -608,7 +620,7 @@ function App() {
 
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
-    (!requestForm.withoutOs && Boolean(requestForm.relatedOs.trim())) ||
+    Boolean(requestForm.relatedOs.trim()) ||
     requestForm.compraParaguai ||
     requestForm.items.some(
       (item) =>
@@ -805,6 +817,7 @@ function App() {
         ...data.order,
         status: normalizeOrderStatus(data.order.status),
         compraParaguai: Boolean(data.order.compraParaguai),
+          relatedOs: data.order.relatedOs ? String(data.order.relatedOs) : '',
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
         commentsHistory: data.order.commentsHistory || []
@@ -836,6 +849,10 @@ function App() {
             nextOrder.items.reduce((sum, item) => sum + Number(item.passedValue || 0), 0)
           )
         );
+      }
+
+      if (field === 'relatedOs') {
+        nextOrder.relatedOs = value;
       }
 
       return nextOrder;
@@ -1182,7 +1199,6 @@ function App() {
           buyerId: requestForm.buyerId,
           urgency: requestForm.urgency,
           relatedOs: requestForm.relatedOs,
-          withoutOs: requestForm.withoutOs,
           compraParaguai: requestForm.compraParaguai,
           items: requestForm.items.map((item) => ({
             productName: item.productName,
@@ -1332,6 +1348,7 @@ function App() {
           status: selectedOrder.status,
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
           comments: commentToSave,
+          relatedOs: String(selectedOrder.relatedOs ?? ''),
           compraParaguai: selectedOrder.compraParaguai,
           items: selectedOrder.items.map((item) => ({
             id: item.id,
@@ -1350,6 +1367,7 @@ function App() {
         ...data.order,
         status: normalizeOrderStatus(data.order.status),
         comments: commentToSave,
+        relatedOs: String(data.order.relatedOs ?? ''),
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
         commentsHistory: data.order.commentsHistory || []
@@ -1621,33 +1639,10 @@ function App() {
                   <span>OS relacionada</span>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    maxLength={5}
                     value={requestForm.relatedOs}
-                    onChange={(event) =>
-                      updateRequestField(
-                        'relatedOs',
-                        event.target.value.replace(/\D+/g, '').slice(0, 5)
-                      )
-                    }
+                    onChange={(event) => updateRequestField('relatedOs', event.target.value)}
                     placeholder="Numero da OS"
-                    disabled={requestForm.withoutOs}
                   />
-                </label>
-
-                <label className="checkbox-field checkbox-field--inline-row checkbox-field--request-os">
-                  <input
-                    type="checkbox"
-                    checked={requestForm.withoutOs}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        withoutOs: event.target.checked,
-                        relatedOs: event.target.checked ? '' : current.relatedOs
-                      }))
-                    }
-                  />
-                  <span>Sem OS</span>
                 </label>
               </div>
 

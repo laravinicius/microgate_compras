@@ -49,6 +49,22 @@ function calculateSaleValue(productValue, compraParaguai = false) {
   return toCurrencyNumber(Number(productValue) * finalMultiplier);
 }
 
+function parseRelatedOsInput(relatedOsRaw) {
+  const trimmedRelatedOs = String(relatedOsRaw ?? '').trim();
+
+  if (!trimmedRelatedOs) {
+    return { relatedOs: null };
+  }
+
+  const numericRelatedOs = Number(trimmedRelatedOs);
+
+  if (!Number.isFinite(numericRelatedOs)) {
+    return { relatedOs: null };
+  }
+
+  return { relatedOs: numericRelatedOs };
+}
+
 function validateItems(items, allowPartial = false) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'Adicione ao menos um item na Solicitação.';
@@ -87,7 +103,6 @@ async function createOrderHandler(request, response, next) {
     const requestName = String(request.body?.requestName ?? '').trim();
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
-    const withoutOs = Boolean(request.body?.withoutOs);
     const compraParaguai = Boolean(request.body?.compraParaguai);
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
@@ -113,12 +128,7 @@ async function createOrderHandler(request, response, next) {
       return;
     }
 
-    if (!withoutOs && !/^\d+$/.test(relatedOsRaw)) {
-      response.status(400).json({
-        error: 'Informe apenas numeros na OS relacionada ou marque "sem OS".'
-      });
-      return;
-    }
+    const relatedOsResult = parseRelatedOsInput(relatedOsRaw);
 
     const itemValidationError = validateItems(items);
 
@@ -149,8 +159,7 @@ async function createOrderHandler(request, response, next) {
       requestName,
       buyerId,
       urgency,
-      relatedOs: withoutOs ? null : Number(relatedOsRaw),
-      withoutOs,
+      relatedOs: relatedOsResult.relatedOs,
       compraParaguai,
       items: normalizedItems
     });
@@ -203,6 +212,7 @@ async function updateOrderHandler(request, response, next) {
     const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
     const comments = String(request.body?.comments ?? '').trim();
     const compraParaguaiRaw = request.body?.compraParaguai;
+    const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
 
     if (!buyerId) {
@@ -242,6 +252,8 @@ async function updateOrderHandler(request, response, next) {
         ? Boolean(currentOrder.compraParaguai)
         : Boolean(compraParaguaiRaw);
 
+    const relatedOsResult = parseRelatedOsInput(relatedOsRaw);
+
     const normalizedItems = items.map((item) => {
       const productValue = toCurrencyNumber(item.productValue);
 
@@ -271,6 +283,7 @@ async function updateOrderHandler(request, response, next) {
       status,
       estimatedDelivery: estimatedDelivery || null,
       comments,
+      relatedOs: relatedOsResult.relatedOs,
       compraParaguai,
       items: normalizedItems
     });

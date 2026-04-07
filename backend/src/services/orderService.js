@@ -105,6 +105,14 @@ function normalizeOrderComment(row) {
   };
 }
 
+function formatOrderOsLabel(relatedOs, withoutOs) {
+  if (withoutOs || relatedOs === null || relatedOs === undefined || relatedOs === '') {
+    return 'sem OS';
+  }
+
+  return String(relatedOs);
+}
+
 async function insertOrderHistory(client, { orderId, userId, description }) {
   await client.query(
     `
@@ -309,7 +317,6 @@ async function createOrder({
   requestName,
   urgency,
   relatedOs,
-  withoutOs,
   compraParaguai,
   items
 }) {
@@ -356,7 +363,7 @@ async function createOrder({
         requestName,
         urgency,
         relatedOs,
-        withoutOs,
+        relatedOs === null || relatedOs === undefined,
         Boolean(compraParaguai),
         total
       ]
@@ -480,7 +487,7 @@ async function createOrder({
 
 async function updateOrder(
   orderId,
-  { userId, buyerId, status, estimatedDelivery, comments, compraParaguai, items }
+  { userId, buyerId, status, estimatedDelivery, comments, relatedOs, compraParaguai, items }
 ) {
   const client = await pool.connect();
 
@@ -495,6 +502,7 @@ async function updateOrder(
     }
 
     const total = items.reduce((sum, item) => sum + Number(item.passedValue), 0);
+    const withoutOs = relatedOs === null || relatedOs === undefined || relatedOs === '';
 
     const orderResult = await client.query(
       `
@@ -504,12 +512,24 @@ async function updateOrder(
           status = $3,
           estimated_delivery = $4,
           comments = $5,
-          compra_paraguai = $6,
-          total = $7
+          related_os = $6,
+          without_os = $7,
+          compra_paraguai = $8,
+          total = $9
         WHERE id = $1
         RETURNING id
       `,
-      [orderId, buyerId, status, estimatedDelivery, comments, compraParaguai, total]
+      [
+        orderId,
+        buyerId,
+        status,
+        estimatedDelivery,
+        comments,
+        relatedOs,
+        withoutOs,
+        compraParaguai,
+        total
+      ]
     );
 
     if (!orderResult.rowCount) {
@@ -559,6 +579,12 @@ async function updateOrder(
 
     if (Number(currentOrder.buyerId || 0) !== Number(buyerId || 0)) {
       historyEntries.push('Comprador alterado.');
+    }
+
+    if (formatOrderOsLabel(currentOrder.relatedOs, currentOrder.withoutOs) !== formatOrderOsLabel(relatedOs, withoutOs)) {
+      historyEntries.push(
+        `OS alterada de "${formatOrderOsLabel(currentOrder.relatedOs, currentOrder.withoutOs)}" para "${formatOrderOsLabel(relatedOs, withoutOs)}".`
+      );
     }
 
     if (Boolean(currentOrder.compraParaguai) !== Boolean(compraParaguai)) {
