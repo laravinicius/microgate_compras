@@ -6,11 +6,15 @@ import {
   getUsers,
   updateUserHandler
 } from '../controllers/userController.js';
-import { requireAdmin, requireAuth } from '../middlewares/authMiddleware.js';
+import {
+  requireAdmin,
+  requireAuth,
+  requirePasswordChangeComplete
+} from '../middlewares/authMiddleware.js';
 
 const userRouter = Router();
 
-userRouter.use(requireAuth);
+userRouter.use(requireAuth, requirePasswordChangeComplete);
 userRouter.get('/users', getUsers);
 userRouter.use(requireAdmin);
 userRouter.post('/users', createUserHandler);

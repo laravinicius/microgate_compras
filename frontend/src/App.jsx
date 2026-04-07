@@ -45,6 +45,12 @@ const emptyUserForm = {
   role: 'solicitante'
 };
 
+const emptyPasswordForm = {
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+};
+
 const createEmptyRequestItem = () => ({
   productName: '',
   productLink: '',
@@ -453,6 +459,76 @@ function OrderDetailContent({
   );
 }
 
+function PasswordChangeContent({
+  currentUser,
+  passwordForm,
+  passwordMessage,
+  passwordMessageType,
+  isSavingPassword,
+  onChangePasswordField,
+  onSubmitPasswordChange
+}) {
+  return (
+    <section className="request-layout">
+      <article className="panel panel--centered">
+        <form className="user-form" onSubmit={onSubmitPasswordChange}>
+          <div className="section-header section-header--page">
+            <div>
+              <p className="eyebrow">Conta</p>
+              <h1 className="page-title">Alterar senha</h1>
+              <p className="description">
+                {currentUser.passwordChangeRequired
+                  ? 'A senha inicial precisa ser alterada antes de continuar.'
+                  : 'Atualize sua senha de acesso quando precisar.'}
+              </p>
+            </div>
+          </div>
+
+          <label>
+            <span>Senha atual</span>
+            <input
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(event) => onChangePasswordField('currentPassword', event.target.value)}
+              placeholder="Informe a senha atual"
+            />
+          </label>
+
+          <label>
+            <span>Nova senha</span>
+            <input
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(event) => onChangePasswordField('newPassword', event.target.value)}
+              placeholder="Informe a nova senha"
+            />
+          </label>
+
+          <label>
+            <span>Confirmar nova senha</span>
+            <input
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(event) => onChangePasswordField('confirmPassword', event.target.value)}
+              placeholder="Repita a nova senha"
+            />
+          </label>
+
+          {passwordMessage ? (
+            <p className={`feedback ${passwordMessageType === 'error' ? 'feedback--error' : ''}`}>
+              {passwordMessage}
+            </p>
+          ) : null}
+
+          <button type="submit" className="button button--green" disabled={isSavingPassword}>
+            {isSavingPassword ? 'Salvando...' : 'Salvar senha'}
+          </button>
+        </form>
+      </article>
+    </section>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(tokenStorageKey) || '');
   const [currentUser, setCurrentUser] = useState(null);
@@ -468,6 +544,10 @@ function App() {
   const [requestMessage, setRequestMessage] = useState('');
   const [requestMessageType, setRequestMessageType] = useState('success');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [passwordForm, setPasswordForm] = useState(emptyPasswordForm);
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordMessageType, setPasswordMessageType] = useState('success');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [orders, setOrders] = useState([]);
   const [ordersFilters, setOrdersFilters] = useState({
     id: '',
@@ -495,6 +575,7 @@ function App() {
 
   const activeOrders = orders.filter((order) => !isFinishedStatus(order.status));
   const historicalOrders = orders.filter((order) => isFinishedStatus(order.status));
+  const passwordChangeRequired = Boolean(currentUser?.passwordChangeRequired);
   const selectedOrderCanEdit = canEditOrder(currentUser, selectedOrder);
   const selectedOrderCanDelete = canDeleteOrder(currentUser);
   const availableStatusFilters =
@@ -526,6 +607,12 @@ function App() {
     );
 
   useEffect(() => {
+    if (currentUser?.passwordChangeRequired) {
+      setActiveTab('password');
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     if (!token) {
       setCurrentUser(null);
       setIsBootstrapping(false);
@@ -546,6 +633,9 @@ function App() {
 
         const data = await response.json();
         setCurrentUser(data.user);
+        if (data.user?.passwordChangeRequired) {
+          setActiveTab('password');
+        }
       } catch (error) {
         clearSession();
         setLoginError(error.message);
@@ -558,7 +648,7 @@ function App() {
   }, [token]);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || currentUser.passwordChangeRequired) {
       setOrders([]);
       return;
     }
@@ -595,7 +685,7 @@ function App() {
   }, [activeTab, availableStatusFilters, ordersFilters.status]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && !currentUser.passwordChangeRequired) {
       loadUsers(token);
     } else {
       setUsers([]);
@@ -806,6 +896,8 @@ function App() {
     setUsers([]);
     setUserForm(emptyUserForm);
     setFormMessage('');
+    setPasswordForm(emptyPasswordForm);
+    setPasswordMessage('');
   }
 
   function confirmDiscardUnsavedRequest() {
@@ -820,6 +912,14 @@ function App() {
 
   function updateLoginField(field, value) {
     setLoginForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function updatePasswordField(field, value) {
+    setPasswordMessage('');
+    setPasswordForm((current) => ({
       ...current,
       [field]: value
     }));
@@ -906,6 +1006,10 @@ function App() {
       return;
     }
 
+    if (passwordChangeRequired && nextTab !== 'password') {
+      return;
+    }
+
     if (!confirmDiscardUnsavedRequest()) {
       return;
     }
@@ -942,7 +1046,9 @@ function App() {
       localStorage.setItem(tokenStorageKey, data.token);
       setToken(data.token);
       setCurrentUser(data.user);
-      setActiveTab('request');
+      setActiveTab(data.user?.passwordChangeRequired ? 'password' : 'request');
+      setPasswordForm(emptyPasswordForm);
+      setPasswordMessage('');
       setLoginForm({
         username: '',
         password: ''
@@ -963,6 +1069,65 @@ function App() {
     closeOrderActions();
     setRequestForm(createEmptyRequestForm());
     setRequestMessage('');
+    setPasswordForm(emptyPasswordForm);
+    setPasswordMessage('');
+  }
+
+  async function handlePasswordChangeSubmit(event) {
+    event.preventDefault();
+
+    if (!currentUser) {
+      return;
+    }
+
+    if (!passwordForm.currentPassword.trim() || !passwordForm.newPassword.trim()) {
+      setPasswordMessageType('error');
+      setPasswordMessage('Informe a senha atual e a nova senha.');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessageType('error');
+      setPasswordMessage('A confirmação da nova senha não confere.');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    setPasswordMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Nao foi possivel atualizar a senha.');
+      }
+
+      setCurrentUser(data.user);
+      setPasswordForm(emptyPasswordForm);
+      setPasswordMessageType('success');
+      setPasswordMessage('Senha atualizada com sucesso.');
+      setPopup({
+        type: 'success',
+        message: 'Senha atualizada com sucesso.'
+      });
+      setActiveTab('request');
+    } catch (error) {
+      setPasswordMessageType('error');
+      setPasswordMessage(error.message);
+    } finally {
+      setIsSavingPassword(false);
+    }
   }
 
   async function handleRequestSubmit(event) {
@@ -1304,36 +1469,48 @@ function App() {
 
           <div className="site-header__actions">
             <nav className="tabbar">
-              <button
-                type="button"
-                className={`tab-button tab-button--green ${activeTab === 'request' ? 'tab-button--active' : ''}`}
-                onClick={() => changeTab('request')}
-              >
-                Nova Solicitação
-              </button>
-              <button
-                type="button"
-                className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
-                onClick={() => changeTab('panel')}
-              >
-                Painel de compras
-              </button>
-              <button
-                type="button"
-                className={`tab-button ${activeTab === 'history' ? 'tab-button--active' : ''}`}
-                onClick={() => changeTab('history')}
-              >
-                Histórico
-              </button>
-              {canManageUsers(currentUser) ? (
-                <button
-                  type="button"
-                  className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
-                  onClick={() => changeTab('users')}
-                >
-                  Usuários
-                </button>
+              {!passwordChangeRequired ? (
+                <>
+                  <button
+                    type="button"
+                    className={`tab-button tab-button--green ${activeTab === 'request' ? 'tab-button--active' : ''}`}
+                    onClick={() => changeTab('request')}
+                  >
+                    Nova Solicitação
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
+                    onClick={() => changeTab('panel')}
+                  >
+                    Painel de compras
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab-button ${activeTab === 'history' ? 'tab-button--active' : ''}`}
+                    onClick={() => changeTab('history')}
+                  >
+                    Histórico
+                  </button>
+                  {canManageUsers(currentUser) ? (
+                    <button
+                      type="button"
+                      className={`tab-button ${activeTab === 'users' ? 'tab-button--active' : ''}`}
+                      onClick={() => changeTab('users')}
+                    >
+                      Usuários
+                    </button>
+                  ) : null}
+                </>
               ) : null}
+
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'password' ? 'tab-button--active' : ''}`}
+                onClick={() => changeTab('password')}
+              >
+                Alterar senha
+              </button>
             </nav>
 
             <button type="button" className="button button--danger" onClick={handleLogout}>
@@ -1355,7 +1532,19 @@ function App() {
           </div>
         ) : null}
 
-        {activeTab === 'request' ? (
+        {activeTab === 'password' ? (
+          <PasswordChangeContent
+            currentUser={currentUser}
+            passwordForm={passwordForm}
+            passwordMessage={passwordMessage}
+            passwordMessageType={passwordMessageType}
+            isSavingPassword={isSavingPassword}
+            onChangePasswordField={updatePasswordField}
+            onSubmitPasswordChange={handlePasswordChangeSubmit}
+          />
+        ) : null}
+
+        {activeTab === 'request' && !passwordChangeRequired ? (
           <section className="request-layout">
             <article className="panel">
               <div className="section-header section-header--page">
@@ -1574,7 +1763,7 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === 'panel' ? (
+        {activeTab === 'panel' && !passwordChangeRequired ? (
           <section className="request-layout">
             <article className="panel">
               {selectedOrder ? (
@@ -1780,7 +1969,7 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === 'history' ? (
+        {activeTab === 'history' && !passwordChangeRequired ? (
           <section className="request-layout">
             <article className="panel">
               {selectedOrder ? (
@@ -1986,7 +2175,7 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === 'users' && canManageUsers(currentUser) ? (
+        {activeTab === 'users' && canManageUsers(currentUser) && !passwordChangeRequired ? (
           <section className="dashboard-grid">
             <article className="panel">
               <div className="section-header section-header--page">

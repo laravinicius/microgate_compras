@@ -1,4 +1,6 @@
+import { verifyPassword } from '../utils/password.js';
 import { authenticateUser } from '../services/authService.js';
+import { findUserById, updateUserPassword } from '../services/userService.js';
 
 async function login(request, response, next) {
   try {
@@ -33,4 +35,40 @@ function getCurrentUser(request, response) {
   });
 }
 
-export { getCurrentUser, login };
+async function changePassword(request, response, next) {
+  try {
+    const currentPassword = String(request.body?.currentPassword ?? '').trim();
+    const newPassword = String(request.body?.newPassword ?? '').trim();
+
+    if (!currentPassword || !newPassword) {
+      response.status(400).json({
+        error: 'Informe a senha atual e a nova senha.'
+      });
+      return;
+    }
+
+    const storedUser = await findUserById(request.user.id);
+
+    if (!storedUser || !verifyPassword(currentPassword, storedUser.password_hash)) {
+      response.status(400).json({
+        error: 'Senha atual invalida.'
+      });
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      response.status(400).json({
+        error: 'A nova senha deve ser diferente da atual.'
+      });
+      return;
+    }
+
+    const user = await updateUserPassword(request.user.id, newPassword);
+
+    response.json({ user });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export { changePassword, getCurrentUser, login };

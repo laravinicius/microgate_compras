@@ -7,14 +7,19 @@ import {
   listOrdersHandler,
   updateOrderHandler
 } from '../controllers/orderController.js';
-import { requireAdmin, requireAuth } from '../middlewares/authMiddleware.js';
+import {
+  requireAdmin,
+  requireAuth,
+  requirePasswordChangeComplete
+} from '../middlewares/authMiddleware.js';
 
 const orderRouter = Router();
 
-orderRouter.get('/orders', requireAuth, listOrdersHandler);
-orderRouter.get('/orders/:id', requireAuth, getOrderDetailsHandler);
-orderRouter.post('/orders', requireAuth, createOrderHandler);
-orderRouter.put('/orders/:id', requireAuth, updateOrderHandler);
-orderRouter.delete('/orders/:id', requireAuth, requireAdmin, deleteOrderHandler);
+orderRouter.use(requireAuth, requirePasswordChangeComplete);
+orderRouter.get('/orders', listOrdersHandler);
+orderRouter.get('/orders/:id', getOrderDetailsHandler);
+orderRouter.post('/orders', createOrderHandler);
+orderRouter.put('/orders/:id', updateOrderHandler);
+orderRouter.delete('/orders/:id', requireAdmin, deleteOrderHandler);
 
 export { orderRouter };

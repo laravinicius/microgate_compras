@@ -57,6 +57,17 @@ async function requireAuth(request, response, next) {
   }
 }
 
+function requirePasswordChangeComplete(request, response, next) {
+  if (request.user?.passwordChangeRequired) {
+    response.status(403).json({
+      error: 'Voce precisa alterar a senha inicial antes de continuar.'
+    });
+    return;
+  }
+
+  next();
+}
+
 function requireAdmin(request, response, next) {
   if (!isAdministrator(request.user)) {
     response.status(403).json({
@@ -74,5 +85,6 @@ export {
   isRequester,
   normalizeRole,
   requireAdmin,
-  requireAuth
+  requireAuth,
+  requirePasswordChangeComplete
 };

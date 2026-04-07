@@ -72,12 +72,16 @@ async function createUserHandler(request, response, next) {
 
 async function updateUserHandler(request, response, next) {
   try {
+    const userId = Number(request.params.id);
     const payload = {
       name: String(request.body?.name ?? '').trim(),
       username: String(request.body?.username ?? '').trim().toLowerCase(),
       password: String(request.body?.password ?? ''),
       email: String(request.body?.email ?? '').trim().toLowerCase() || null,
-      role: String(request.body?.role ?? 'solicitante').trim()
+      role: String(request.body?.role ?? 'solicitante').trim(),
+      passwordChangeRequired: String(request.body?.password ?? '').trim()
+        ? request.user?.id !== userId
+        : undefined
     };
     const validationError = validateUserPayload(payload, true);
 
@@ -86,7 +90,7 @@ async function updateUserHandler(request, response, next) {
       return;
     }
 
-    const user = await updateUser(Number(request.params.id), payload);
+    const user = await updateUser(userId, payload);
 
     if (!user) {
       response.status(404).json({

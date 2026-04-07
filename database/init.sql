@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(120) NOT NULL,
   username VARCHAR(80) NOT NULL UNIQUE,
   password_hash TEXT,
+  password_change_required BOOLEAN NOT NULL DEFAULT FALSE,
   email VARCHAR(120) UNIQUE,
   role VARCHAR(20) NOT NULL DEFAULT 'solicitante',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -13,6 +14,9 @@ ADD COLUMN IF NOT EXISTS username VARCHAR(80);
 
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS password_change_required BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'solicitante';
@@ -153,7 +157,8 @@ ON CONFLICT (username) DO NOTHING;
 UPDATE users
 SET
   role = 'administrador',
-  password_hash = 'microgate-admin:6c20e0d5e52c78dc7a0377003765a0672a172cf7fef2bdf195364d4dfb0a2392ad76fa310d242f5dadacc40b76c9162adff2c7ad3bbbc8c676d34d0ffd1bb745'
+  password_hash = 'microgate-admin:6c20e0d5e52c78dc7a0377003765a0672a172cf7fef2bdf195364d4dfb0a2392ad76fa310d242f5dadacc40b76c9162adff2c7ad3bbbc8c676d34d0ffd1bb745',
+  password_change_required = TRUE
 WHERE username = 'admin';
 
 INSERT INTO orders (user_id, status, total)

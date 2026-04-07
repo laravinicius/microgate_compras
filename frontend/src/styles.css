@@ -95,7 +95,7 @@ select option {
 }
 
 .page--dashboard {
-  padding-top: 124px;
+  padding-top: 136px;
 }
 
 .popup-overlay {
@@ -164,10 +164,11 @@ select option {
 
 .site-header__inner {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 16px 22px;
+  gap: 18px;
+  padding: 12px 18px;
   border-radius: 20px;
 }
 
@@ -178,6 +179,11 @@ select option {
   gap: 16px;
 }
 
+.site-brand {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .site-brand__logo,
 .auth-brand__logo {
   display: block;
@@ -186,7 +192,7 @@ select option {
 }
 
 .site-brand__logo {
-  height: 48px;
+  height: 42px;
 }
 
 .auth-brand__logo {
@@ -208,13 +214,13 @@ select option {
 }
 
 .site-brand__copy strong {
-  font-size: 1rem;
+  font-size: 0.92rem;
   letter-spacing: 0.03em;
 }
 
 .site-brand__copy span {
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.8rem;
 }
 
 .site-header__actions,
@@ -236,9 +242,21 @@ select option {
   gap: 14px;
 }
 
+.site-header__actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
 .tabbar {
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.tab-button {
+  padding: 9px 14px;
+  font-size: 0.9rem;
 }
 
 .panel {
@@ -816,14 +834,11 @@ input[readonly] {
     -webkit-overflow-scrolling: touch;
   }
 
-  .site-header__inner,
-  .site-header__actions,
   .section-header,
   .order-actions__top-buttons,
   .user-card,
   .items-header,
   .item-card__header,
-  .tabbar,
   .order-total {
     align-items: flex-start;
     flex-direction: column;
@@ -838,6 +853,27 @@ input[readonly] {
   }
 }
 
+@media (max-width: 1024px) {
+  .site-header__inner,
+  .site-header__actions,
+  .tabbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .site-header__actions {
+    width: 100%;
+  }
+
+  .tabbar {
+    flex-wrap: wrap;
+  }
+
+  .page--dashboard {
+    padding-top: 176px;
+  }
+}
+
 @media (max-width: 720px) {
   .page,
   .site-header {
@@ -849,7 +885,7 @@ input[readonly] {
   }
 
   .page--dashboard {
-    padding-top: 150px;
+    padding-top: 188px;
   }
 
   .panel,
