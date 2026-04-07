@@ -340,7 +340,7 @@ function OrderDetailContent({
           </label>
 
           <label>
-            <span>Data da Solicitação</span>
+            <span>Data do pedido</span>
             <input type="text" value={formatDateTime(selectedOrder.createdAt)} readOnly />
           </label>
 
@@ -349,7 +349,10 @@ function OrderDetailContent({
             <input
               type="text"
               value={relatedOsValue}
-              onChange={(event) => updateSelectedOrderField('relatedOs', event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value.replace(/[^0-9]/g, '');
+                updateSelectedOrderField('relatedOs', value);
+              }}
               placeholder="Numero da OS"
               disabled={!selectedOrderCanEdit}
             />
@@ -624,7 +627,7 @@ function App() {
 
     const timeoutId = window.setTimeout(() => {
       setPopup(null);
-    }, 5000);
+    }, 3000);
 
     return () => window.clearTimeout(timeoutId);
   }, [popup]);
@@ -795,7 +798,7 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar as Requisições.');
+        throw new Error('Nao foi possivel carregar os pedidos.');
       }
 
       const data = await response.json();
@@ -952,9 +955,16 @@ function App() {
       return true;
     }
 
-    return window.confirm(
-      'Existem alteracoes nao salvas nesta Solicitação. Deseja sair mesmo assim?'
+    const confirmed = window.confirm(
+      'Existem alteracoes nao salvas neste pedido. Deseja sair mesmo assim?'
     );
+
+    if (confirmed) {
+      setRequestForm(createEmptyRequestForm());
+      setRequestMessage('');
+    }
+
+    return confirmed;
   }
 
   function updateLoginField(field, value) {
@@ -1222,15 +1232,15 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Nao foi possivel enviar a Solicitação.');
+        throw new Error(data.error || 'Nao foi possivel enviar o pedido.');
       }
 
       setRequestForm(createEmptyRequestForm());
       setRequestMessageType('success');
-      setRequestMessage('Solicitação enviada com sucesso.');
+      setRequestMessage('Pedido enviado com sucesso.');
       setPopup({
         type: 'success',
-        message: 'Solicitação enviada com sucesso.'
+        message: 'Pedido enviado com sucesso.'
       });
       setActiveTab('panel');
       await loadOrders(token, ordersFilters);
@@ -1591,14 +1601,14 @@ function App() {
                     className={`tab-button tab-button--green ${activeTab === 'request' ? 'tab-button--active' : ''}`}
                     onClick={() => changeTab('request')}
                   >
-                    Nova Solicitação
+                    Novo pedido
                   </button>
                   <button
                     type="button"
                     className={`tab-button ${activeTab === 'panel' ? 'tab-button--active' : ''}`}
                     onClick={() => changeTab('panel')}
                   >
-                    Painel de compras
+                    Painel de pedidos
                   </button>
                   <button
                     type="button"
@@ -1637,13 +1647,16 @@ function App() {
 
       <main className="page page--dashboard">
         {popup ? (
-          <div className="popup-overlay" role="status" aria-live="polite" aria-atomic="true">
-            <div className={`popup popup--${popup.type}`}>
+          <div
+            className={`notification notification--${popup.type}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div className="notification__content">
               <p>{popup.message}</p>
-              <button type="button" className="button button--ghost" onClick={() => setPopup(null)}>
-                OK
-              </button>
             </div>
+            <div className="notification__progress" aria-hidden="true"></div>
           </div>
         ) : null}
 
@@ -1664,7 +1677,7 @@ function App() {
             <article className="panel">
               <div className="section-header section-header--page">
                 <div>
-                  <p className="eyebrow">Nova Solicitação</p>
+                  <p className="eyebrow">Novo pedido</p>
                   <h1 className="page-title">Preencha os dados do pedido</h1>
                 </div>
               </div>
@@ -1713,7 +1726,10 @@ function App() {
                   <input
                     type="text"
                     value={requestForm.relatedOs}
-                    onChange={(event) => updateRequestField('relatedOs', event.target.value)}
+                    onChange={(event) => {
+                      const value = event.target.value.replace(/[^0-9]/g, '');
+                      updateRequestField('relatedOs', value);
+                    }}
                     placeholder="Numero da OS"
                   />
                 </label>
@@ -1722,7 +1738,7 @@ function App() {
                 <div className="items-header">
                   <div>
                     <p className="eyebrow">Itens</p>
-                    <h2>Produtos da Solicitação</h2>
+                    <h2>Produtos do pedido</h2>
                   </div>
 
                   <button type="button" className="button button--ghost" onClick={addRequestItem}>
@@ -1795,14 +1811,15 @@ function App() {
                       <label>
                         <span>Qtd</span>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           min="1"
                           max="9999"
-                          step="1"
                           value={item.quantity}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'quantity', event.target.value)
-                          }
+                          onChange={(event) => {
+                            const value = event.target.value.replace(/[^0-9]/g, '');
+                            updateRequestItem(index, 'quantity', value);
+                          }}
                         />
                       </label>
 
@@ -1840,7 +1857,7 @@ function App() {
                 ) : null}
 
                 <button type="submit" className="button button--green" disabled={isSubmittingRequest}>
-                  {isSubmittingRequest ? 'Enviando...' : 'Enviar Solicitação'}
+                  {isSubmittingRequest ? 'Enviando...' : 'Enviar pedido'}
                 </button>
               </form>
             </article>
@@ -1857,9 +1874,39 @@ function App() {
                       <p className="eyebrow">Pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
-                        Acompanhe status, valores e Histórico desta Solicitação.
+                        Acompanhe status, valores e Histórico deste pedido.
                       </p>
                     </div>
+
+                    <aside className="order-actions-sidebar order-actions-sidebar--header">
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('order')}
+                      >
+                        Pedido
+                      </button>
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('comments')}
+                      >
+                        Comentarios
+                      </button>
+                      <button
+                        type="button"
+                        className={`order-actions-nav-button ${
+                          selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
+                        }`}
+                        onClick={() => setSelectedOrderSection('history')}
+                      >
+                        Histórico
+                      </button>
+                    </aside>
                   </div>
 
                 {selectedOrderError ? (
@@ -1867,36 +1914,6 @@ function App() {
                 ) : null}
 
                 <div className="order-actions-layout">
-                  <aside className="order-actions-sidebar">
-                    <button
-                      type="button"
-                      className={`order-actions-nav-button ${
-                        selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
-                      }`}
-                      onClick={() => setSelectedOrderSection('order')}
-                    >
-                      Pedido
-                    </button>
-                    <button
-                      type="button"
-                      className={`order-actions-nav-button ${
-                        selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
-                      }`}
-                      onClick={() => setSelectedOrderSection('comments')}
-                    >
-                      Comentarios
-                    </button>
-                    <button
-                      type="button"
-                      className={`order-actions-nav-button ${
-                        selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
-                      }`}
-                      onClick={() => setSelectedOrderSection('history')}
-                    >
-                      Histórico
-                    </button>
-                  </aside>
-
                   <div className="order-actions-content">
                     <OrderDetailContent
                       currentSection={selectedOrderSection}
@@ -1946,8 +1963,8 @@ function App() {
                 <>
                   <div className="section-header section-header--page">
                     <div>
-                      <p className="eyebrow">Painel de compras</p>
-                      <h1 className="page-title">Lista das Requisições</h1>
+                      <p className="eyebrow">Painel de pedidos</p>
+                      <h1 className="page-title">Lista de pedidos</h1>
                       <p className="description">
                         Consulte pedidos ativos, andamento de compras e movimentacoes recentes.
                       </p>
@@ -1997,7 +2014,7 @@ function App() {
                 </div>
 
                 {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
-                {isLoadingOrders ? <p>Carregando Requisições...</p> : null}
+                {isLoadingOrders ? <p>Carregando pedidos...</p> : null}
                 {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
 
                 {!isLoadingOrders && !ordersError ? (
@@ -2015,7 +2032,7 @@ function App() {
 
                     <div className="orders-table__body">
                       {activeOrders.length === 0 ? (
-                        <p className="empty-state">Nenhuma requisicao ativa encontrada.</p>
+                        <p className="empty-state">Nenhum pedido ativo encontrado.</p>
                       ) : (
                         activeOrders.map((order) => (
                           <article
@@ -2025,7 +2042,7 @@ function App() {
                             tabIndex={0}
                             onClick={() => openOrderActions(order.id)}
                             onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
-                            aria-label={`Abrir requisição ${order.id}`}
+                            aria-label={`Abrir pedido ${order.id}`}
                           >
                             <strong>#{order.id}</strong>
                             <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
@@ -2063,17 +2080,11 @@ function App() {
                       <p className="eyebrow">Histórico do pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
-                        Requisições finalizadas sao consideradas encerradas e ficam arquivadas aqui.
+                        Pedidos finalizados sao considerados encerrados e ficam arquivados aqui.
                       </p>
                     </div>
-                  </div>
 
-                  {selectedOrderError ? (
-                    <p className="feedback feedback--error">{selectedOrderError}</p>
-                  ) : null}
-
-                  <div className="order-actions-layout">
-                    <aside className="order-actions-sidebar">
+                    <aside className="order-actions-sidebar order-actions-sidebar--header">
                       <button
                         type="button"
                         className={`order-actions-nav-button ${
@@ -2102,7 +2113,13 @@ function App() {
                         Histórico
                       </button>
                     </aside>
+                  </div>
 
+                  {selectedOrderError ? (
+                    <p className="feedback feedback--error">{selectedOrderError}</p>
+                  ) : null}
+
+                  <div className="order-actions-layout">
                     <div className="order-actions-content">
                       <OrderDetailContent
                         currentSection={selectedOrderSection}
@@ -2153,7 +2170,7 @@ function App() {
                   <div className="section-header section-header--page">
                     <div>
                       <p className="eyebrow">Histórico</p>
-                      <h1 className="page-title">Requisições finalizadas</h1>
+                      <h1 className="page-title">Pedidos finalizados</h1>
                       <p className="description">
                         Aqui ficam os pedidos finalizados, considerados concluidos.
                       </p>
@@ -2222,7 +2239,7 @@ function App() {
 
                       <div className="orders-table__body">
                         {historicalOrders.length === 0 ? (
-                          <p className="empty-state">Nenhuma requisicao finalizada encontrada.</p>
+                          <p className="empty-state">Nenhum pedido finalizado encontrado.</p>
                         ) : (
                           historicalOrders.map((order) => (
                             <article
@@ -2232,7 +2249,7 @@ function App() {
                               tabIndex={0}
                               onClick={() => openOrderActions(order.id)}
                               onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
-                              aria-label={`Abrir requisição ${order.id}`}
+                              aria-label={`Abrir pedido ${order.id}`}
                             >
                               <strong>#{order.id}</strong>
                               <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>

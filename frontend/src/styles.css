@@ -98,50 +98,92 @@ select option {
   padding-top: 136px;
 }
 
-.popup-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.56);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+@keyframes progress-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
-.popup {
-  display: grid;
-  gap: 18px;
-  justify-items: center;
-  min-width: min(520px, 100%);
-  max-width: 680px;
-  min-height: 160px;
-  padding: 24px 28px;
-  border-radius: 22px;
+.notification {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 80;
+  width: min(380px, calc(100vw - 32px));
+  max-width: 380px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(31, 31, 31, 0.94);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  text-align: center;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
 }
 
-.popup p {
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(400px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.notification__content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.notification__content p {
   margin: 0;
-  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #fff;
 }
 
-.popup--success {
+.notification--success {
   border-color: rgba(134, 239, 172, 0.28);
   background: rgba(19, 48, 31, 0.92);
 }
 
-.popup--warning {
+.notification--success .notification__content p {
+  color: #86efac;
+}
+
+.notification--warning {
   border-color: rgba(253, 186, 116, 0.32);
   background: rgba(84, 45, 8, 0.94);
+}
+
+.notification--warning .notification__content p {
+  color: #fdba74;
+}
+
+.notification__progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.notification__progress::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(134, 239, 172, 0.78);
+  transform-origin: left center;
+  animation: progress-shrink 3s linear forwards;
+}
+
+.notification--warning .notification__progress::before {
+  background: rgba(253, 186, 116, 0.78);
 }
 
 .site-header {
@@ -653,6 +695,12 @@ input[readonly] {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   position: static;
+}
+
+.order-actions-sidebar--header {
+  justify-content: flex-end;
+  align-self: flex-start;
+  max-width: 520px;
 }
 
 .order-actions-content {
