@@ -1,17 +1,17 @@
-# Deploy HML -> PRD
+# Deploy Homologacao (HML) -> Producao (PRD)
 
 Este documento descreve como replicar em producao o ambiente validado em homologacao no Ubuntu.
 
 Padrao definido para facilitar a replica:
 
-- HML: preferencialmente usar o mesmo caminho final
-- PRD: `/var/www/microgate_compras`
+- Homologacao (HML): preferencialmente usar o mesmo caminho final
+- Producao (PRD): `/var/www/microgate_compras`
 - Banco de dados: por enquanto HML e PRD usam o mesmo banco atual
 
 Observacao importante:
 
-- O ideal e que o HML tambem passe a usar `/var/www/microgate_compras`
-- Mais adiante, quando existir um banco exclusivo para HML, basta trocar apenas a `DATABASE_URL` do backend
+- O ideal e que a homologacao (HML) tambem passe a usar `/var/www/microgate_compras`
+- Mais adiante, quando existir um banco exclusivo de HML, basta trocar apenas a `DATABASE_URL` do backend
 
 ## 1. Estrutura esperada
 
@@ -28,7 +28,7 @@ Em ambos os ambientes, mantenha a mesma estrutura:
 
 ### Instalar dependencias
 
-No HML:
+Em homologacao (HML):
 
 ```bash
 cd /var/www/microgate_compras/backend
@@ -36,7 +36,7 @@ cp .env.example .env
 npm install
 ```
 
-Repita no PRD apos publicar os arquivos:
+Repita em producao (PRD) apos publicar os arquivos:
 
 ```bash
 cd /var/www/microgate_compras/backend
@@ -53,12 +53,15 @@ HOST=127.0.0.1
 PORT=4000
 FRONTEND_URL=https://compras.seudominio.com.br
 DATABASE_URL=postgresql://usuario:senha@IP_DO_SERVIDOR_BANCO:5432/compras_db
+AUTH_SECRET=gere_um_segredo_forte_com_32_bytes_ou_mais
+ENABLE_EMAIL=true
 ```
 
 Observacoes:
 
 - `PORT=4000` deve ficar acessivel apenas localmente
 - `DATABASE_URL` deve apontar para o servidor PostgreSQL remoto
+- `AUTH_SECRET` deve ser forte e exclusivo por ambiente
 - Neste momento, HML e PRD podem usar o mesmo banco atual
 - Quando existir um banco especifico de HML, altere somente a `DATABASE_URL` do HML
 
@@ -109,7 +112,7 @@ Boa pratica:
 
 ### Instalar dependencias e gerar build
 
-Em HML:
+Em homologacao (HML):
 
 ```bash
 cd /var/www/microgate_compras/frontend
@@ -118,7 +121,7 @@ npm install
 npm run build
 ```
 
-Em PRD:
+Em producao (PRD):
 
 ```bash
 cd /var/www/microgate_compras/frontend
@@ -159,13 +162,13 @@ Observacoes:
 
 - O servidor PostgreSQL deve aceitar conexoes a partir do servidor Ubuntu onde o Node.js esta rodando
 - Se houver firewall, a porta `5432` precisa estar liberada entre os servidores
-- Se futuramente houver um banco separado de HML, altere apenas a `DATABASE_URL` do HML
+- Se futuramente houver um banco separado de HML, altere apenas a `DATABASE_URL` da homologacao
 
 ### Criar tabelas iniciais
 
 Execute o script abaixo no banco atual:
 
-Arquivo: [`database/init.sql`](/var/www/microgate_compras2/database/init.sql)
+Arquivo: `database/init.sql`
 
 Exemplo:
 
@@ -236,18 +239,18 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 6. Fluxo recomendado HML -> PRD
+## 6. Fluxo recomendado homologacao (HML) -> producao (PRD)
 
-1. Publicar o codigo em HML.
-2. Configurar `.env` do backend e frontend no HML.
-3. Validar se a `DATABASE_URL` do HML aponta corretamente para o banco atual.
+1. Publicar o codigo em homologacao (HML).
+2. Configurar `.env` do backend e frontend em homologacao.
+3. Validar se a `DATABASE_URL` de homologacao aponta corretamente para o banco atual.
 4. Executar `database/init.sql` no banco, se necessario.
 5. Rodar `npm install` no backend e frontend.
 6. Gerar `npm run build` no frontend.
 7. Subir backend com PM2 na porta `4000`.
-8. Configurar Nginx do HML apontando `/` para `frontend/dist` e `/api` para `127.0.0.1:4000`.
-9. Validar o funcionamento completo em HML.
-10. Replicar os mesmos passos em PRD.
+8. Configurar Nginx de homologacao apontando `/` para `frontend/dist` e `/api` para `127.0.0.1:4000`.
+9. Validar o funcionamento completo em homologacao.
+10. Replicar os mesmos passos em producao (PRD).
 11. Ajustar somente dominio, arquivo `.env` e eventuais credenciais especificas.
 
 ## 7. Checklist final
@@ -268,17 +271,17 @@ sudo systemctl reload nginx
 - No Ubuntu, mantenha o backend escutando apenas em `127.0.0.1:4000`
 - Versione apenas `.env.example`, nunca o `.env` real
 - Valide `nginx -t` antes de recarregar o servico
-- Enquanto HML e PRD usarem o mesmo banco, trate os testes de HML com cuidado para nao afetar dados reais
+- Enquanto HML e PRD usarem o mesmo banco, trate os testes de homologacao com cuidado para nao afetar dados reais
 
 ## 9. Preparacao futura
 
-### Separar banco de HML
+### Separar banco de homologacao (HML)
 
 Quando voce criar um banco proprio de homologacao:
 
 1. Crie o novo banco.
-2. Execute o script [`database/init.sql`](/var/www/microgate_compras2/database/init.sql).
-3. Altere a `DATABASE_URL` do HML.
+2. Execute o script `database/init.sql`.
+3. Altere a `DATABASE_URL` da homologacao.
 4. Reinicie o backend no PM2:
 
 ```bash

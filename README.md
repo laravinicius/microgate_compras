@@ -1,24 +1,52 @@
-# Sistema de Compras Node.js
+# Microgate Compras
 
-Estrutura inicial do novo sistema web separada em:
+Aplicacao de gestao de solicitacoes de compra, com frontend em React (Vite) e backend em Node.js/Express usando PostgreSQL.
 
-- `backend`: API REST em Node.js/Express com PostgreSQL
-- `frontend`: aplicacao React com build estatico
+## Visao geral
 
-## Estrutura
+- Backend: API REST com autenticacao, controle por perfil, historico de pedidos e envio opcional de email.
+- Frontend: interface unica para login, criacao/edicao de pedidos, acompanhamento, historico e administracao de usuarios.
+- Banco: script inicial completo em `database/init.sql` e migracoes incrementais em `database/migrations`.
+
+## Estrutura do repositorio
 
 ```text
 .
-├── backend
-├── database
-│   └── init.sql
-├── frontend
-└── DEPLOY_PRODUCAO.md
+├── backend/
+│   ├── ecosystem.config.cjs
+│   ├── package.json
+│   └── src/
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+├── database/
+│   ├── init.sql
+│   └── migrations/
+├── deploy.md
+└── README.md
 ```
 
-## Como rodar localmente
+## Requisitos
 
-### 1. Backend
+- Node.js 18+
+- npm 9+
+- PostgreSQL 13+
+
+## Setup local rapido
+
+### 1) Banco de dados
+
+Crie o banco e aplique o script base:
+
+```bash
+createdb compras_db
+psql -d compras_db -f database/init.sql
+```
+
+Se estiver atualizando um banco antigo, aplique tambem as migracoes de `database/migrations` em ordem numerica.
+
+### 2) Backend
 
 ```bash
 cd backend
@@ -27,11 +55,14 @@ npm install
 npm run dev
 ```
 
-API disponivel em `http://localhost:4000/api/health`.
+API local:
 
-Se for testar com o frontend Vite em outra maquina/dispositivo, ajuste `HOST` no `.env` do backend.
+- `http://127.0.0.1:4000/`
+- `http://127.0.0.1:4000/api/health`
 
-### 2. Frontend
+### 3) Frontend
+
+Em outro terminal:
 
 ```bash
 cd frontend
@@ -40,24 +71,119 @@ npm install
 npm run dev
 ```
 
-Frontend de desenvolvimento disponivel em `http://localhost:5173`.
+Frontend local:
 
-## Build do frontend
+- `http://localhost:5173`
+
+## Variaveis de ambiente
+
+### Backend (`backend/.env`)
+
+Baseado em `backend/.env.example`:
+
+- `NODE_ENV` (ex.: `development` | `production`)
+- `HOST` (padrao local: `127.0.0.1`)
+- `PORT` (padrao: `4000`)
+- `FRONTEND_URL` (origem permitida no CORS e base de links de email)
+- `DATABASE_URL` (conexao PostgreSQL)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (email)
+- `ENABLE_EMAIL` (`true`/`false`)
+- `AUTH_SECRET` (obrigatorio em producao com valor forte)
+
+Observacoes importantes:
+
+- Em producao, o backend nao inicia se `AUTH_SECRET` estiver no valor padrao inseguro.
+- Nao versione `.env` real com credenciais.
+
+### Frontend (`frontend/.env`)
+
+Baseado em `frontend/.env.example`:
+
+- `VITE_API_BASE_URL` (padrao recomendado: `/api`)
+
+No desenvolvimento, o Vite faz proxy de `/api` para `http://localhost:4000`.
+
+## Scripts
+
+### Backend (`backend/package.json`)
+
+- `npm run dev`: sobe servidor com watch em `src/server.js`
+- `npm start`: sobe servidor sem watch
+- `npm run check`: validacao sintatica de `src/server.js`
+
+### Frontend (`frontend/package.json`)
+
+- `npm run dev`: inicia Vite em `0.0.0.0:5173`
+- `npm run build`: gera build de producao em `frontend/dist`
+- `npm run preview`: preview local do build
+
+### Raiz do projeto
+
+O `package.json` da raiz nao possui scripts de build/check do projeto.
+
+## API (resumo)
+
+Prefixo base: `/api`
+
+Publicas:
+
+- `GET /health`
+- `POST /auth/login` (com rate limit)
+
+Autenticadas:
+
+- `GET /auth/me`
+- `PUT /auth/password`
+- `GET /orders`
+- `GET /orders/:id`
+- `POST /orders`
+- `PUT /orders/:id`
+- `PUT /orders/:id/reopen`
+- `DELETE /orders/:id` (somente administrador)
+- `GET /users` (somente administrador)
+- `POST /users`
+- `PUT /users/:id`
+- `DELETE /users/:id`
+
+## Perfis e regras
+
+Perfis usados pelo sistema:
+
+- `administrador`
+- `comprador`
+- `solicitante`
+
+Regras gerais:
+
+- Rotas de pedidos e usuarios exigem autenticacao.
+- Usuario com troca de senha pendente nao pode seguir ate alterar senha.
+- `GET /users` e exclusao de pedidos sao restritos a administrador.
+- Escopo de visualizacao de pedido depende do perfil (admin/comprador/solicitante).
+
+## Build e deploy
+
+Build do frontend:
 
 ```bash
 cd frontend
-npm install
 npm run build
 ```
 
-Os arquivos gerados ficarao em `frontend/dist/` e devem ser servidos pelo Nginx em homologacao/producao.
+Saida: `frontend/dist`.
 
-## Banco de dados
+Em producao, a recomendacao e:
 
-Use o script [`database/init.sql`](/var/www/microgate_compras2/database/init.sql) para criar a estrutura inicial.
+- Backend via PM2 (ex.: app `compras-backend`)
+- Nginx servindo `frontend/dist`
+- Proxy de `/api` para backend em `127.0.0.1:4000`
 
-## PM2
+Guia operacional completo (homologacao -> producao): `deploy.md`.
 
-Existe um arquivo opcional em [`backend/ecosystem.config.cjs`](/var/www/microgate_compras2/backend/ecosystem.config.cjs) para facilitar o uso futuro com PM2.
+## Verificacao rapida
 
-pm2 reload compras-backend
+Depois de subir backend e frontend localmente:
+
+1. Acesse `GET /api/health` e valide retorno com `status: ok`.
+2. Faça login com um usuario existente no banco.
+3. Crie/edite um pedido e confirme listagem/historico.
+4. Gere o build com `npm run build` em `frontend`.
