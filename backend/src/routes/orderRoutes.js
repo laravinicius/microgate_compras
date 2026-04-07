@@ -5,6 +5,7 @@ import {
   deleteOrderHandler,
   getOrderDetailsHandler,
   listOrdersHandler,
+  reopenOrderHandler,
   updateOrderHandler
 } from '../controllers/orderController.js';
 import {
@@ -20,6 +21,7 @@ orderRouter.get('/orders', listOrdersHandler);
 orderRouter.get('/orders/:id', getOrderDetailsHandler);
 orderRouter.post('/orders', createOrderHandler);
 orderRouter.put('/orders/:id', updateOrderHandler);
+orderRouter.put('/orders/:id/reopen', reopenOrderHandler);
 orderRouter.delete('/orders/:id', requireAdmin, deleteOrderHandler);
 
 export { orderRouter };

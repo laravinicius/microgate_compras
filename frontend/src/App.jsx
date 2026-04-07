@@ -4,20 +4,21 @@ import microgateLogo from './assets/microgate2.png';
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
 const mergedPurchasedStatus = 'comprado/aguardando entrega';
+const finalizedStatus = 'finalizado';
 const orderStatuses = [
   'pendente',
   mergedPurchasedStatus,
-  'entregue',
+  finalizedStatus,
   'cancelado'
 ];
 const panelFilterStatuses = ['pendente', mergedPurchasedStatus];
-const historyFilterStatuses = ['entregue', 'cancelado'];
+const historyFilterStatuses = [finalizedStatus, 'cancelado'];
 
 const orderStatusLabels = {
   pending: 'pendente',
   purchased: mergedPurchasedStatus,
   waiting_delivery: mergedPurchasedStatus,
-  delivered: 'entregue',
+  delivered: 'Finalizado',
   email_pending: 'pendente email',
   cancelled: 'cancelado',
   pendente: 'pendente',
@@ -25,7 +26,8 @@ const orderStatusLabels = {
   'aguardando entrega': mergedPurchasedStatus,
   'comprado/aguardando entrega': mergedPurchasedStatus,
   'pendente email': 'pendente email',
-  entregue: 'entregue',
+  entregue: 'Finalizado',
+  finalizado: 'Finalizado',
   cancelado: 'cancelado'
 };
 
@@ -36,6 +38,10 @@ function normalizeOrderStatus(status) {
 
   if (status === 'aguardando entrega' || status === 'waiting_delivery') {
     return mergedPurchasedStatus;
+  }
+
+  if (status === 'entregue' || status === 'delivered') {
+    return finalizedStatus;
   }
 
   return status;
@@ -83,6 +89,7 @@ const createEmptyRequestForm = () => ({
 });
 
 const isFinishedStatus = (status) =>
+  status === finalizedStatus ||
   status === 'entregue' ||
   status === 'delivered' ||
   status === 'cancelado' ||
@@ -195,8 +202,20 @@ function canManageUsers(user) {
   return isAdministrator(user);
 }
 
+function canReopenOrder(user) {
+  return isAdministrator(user) || isBuyer(user);
+}
+
+function getPersistedOrderStatus(order) {
+  return order?.persistedStatus || order?.status;
+}
+
 function canEditOrder(user, order) {
   if (!user || !order) {
+    return false;
+  }
+
+  if (isFinishedStatus(getPersistedOrderStatus(order))) {
     return false;
   }
 
@@ -207,8 +226,12 @@ function canEditOrder(user, order) {
   );
 }
 
-function canDeleteOrder(user) {
-  return isAdministrator(user);
+function canDeleteOrder(user, order) {
+  if (!isAdministrator(user)) {
+    return false;
+  }
+
+  return !isFinishedStatus(getPersistedOrderStatus(order));
 }
 
 function formatRoleLabel(role) {
@@ -573,6 +596,7 @@ function App() {
   const [orderActionMessage, setOrderActionMessage] = useState('');
   const [isSavingSelectedOrder, setIsSavingSelectedOrder] = useState(false);
   const [isDeletingSelectedOrder, setIsDeletingSelectedOrder] = useState(false);
+  const [reopeningOrderId, setReopeningOrderId] = useState(null);
   const [selectedOrderSection, setSelectedOrderSection] = useState('order');
   const [selectedOrderCommentDraft, setSelectedOrderCommentDraft] = useState('');
   const [users, setUsers] = useState([]);
@@ -588,7 +612,8 @@ function App() {
   const historicalOrders = orders.filter((order) => isFinishedStatus(order.status));
   const passwordChangeRequired = Boolean(currentUser?.passwordChangeRequired);
   const selectedOrderCanEdit = canEditOrder(currentUser, selectedOrder);
-  const selectedOrderCanDelete = canDeleteOrder(currentUser);
+  const selectedOrderCanDelete = canDeleteOrder(currentUser, selectedOrder);
+  const userCanReopenOrder = canReopenOrder(currentUser);
   const availableStatusFilters =
     activeTab === 'history' ? historyFilterStatuses : panelFilterStatuses;
 
@@ -799,9 +824,12 @@ function App() {
         throw new Error(data.error || 'Nao foi possivel carregar o pedido.');
       }
 
+      const persistedStatus = normalizeOrderStatus(data.order.status);
+
       setSelectedOrder({
         ...data.order,
-        status: normalizeOrderStatus(data.order.status),
+        status: persistedStatus,
+        persistedStatus,
         relatedOs: data.order.relatedOs ? String(data.order.relatedOs) : '',
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
@@ -1345,9 +1373,12 @@ function App() {
         throw new Error(data.error || 'Nao foi possivel salvar o pedido.');
       }
 
+      const persistedStatus = normalizeOrderStatus(data.order.status);
+
       setSelectedOrder({
         ...data.order,
-        status: normalizeOrderStatus(data.order.status),
+        status: persistedStatus,
+        persistedStatus,
         comments: commentToSave,
         relatedOs: String(data.order.relatedOs ?? ''),
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
@@ -1373,7 +1404,7 @@ function App() {
   }
 
   async function handleDeleteSelectedOrder() {
-    if (!selectedOrder || !canDeleteOrder(currentUser)) {
+    if (!selectedOrder || !canDeleteOrder(currentUser, selectedOrder)) {
       return;
     }
 
@@ -1407,6 +1438,66 @@ function App() {
       setOrderActionMessage(error.message);
     } finally {
       setIsDeletingSelectedOrder(false);
+    }
+  }
+
+  async function handleReopenOrder(order) {
+    if (!canReopenOrder(currentUser)) {
+      return;
+    }
+
+    const reason = window.prompt(
+      `Informe o motivo da reabertura do pedido #${order.id}:`
+    );
+
+    if (reason === null) {
+      return;
+    }
+
+    const trimmedReason = reason.trim();
+
+    if (!trimmedReason) {
+      setPopup({
+        type: 'warning',
+        message: 'O motivo da reabertura e obrigatorio.'
+      });
+      return;
+    }
+
+    setReopeningOrderId(order.id);
+    setOrderActionMessage('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders/${order.id}/reopen`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          reason: trimmedReason
+        })
+      });
+
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Nao foi possivel reabrir o pedido.');
+      }
+
+      setPopup({
+        type: 'success',
+        message: `Pedido #${order.id} reaberto com sucesso.`
+      });
+
+      await loadOrders(token, ordersFilters);
+    } catch (error) {
+      setPopup({
+        type: 'error',
+        message: error.message
+      });
+    } finally {
+      setReopeningOrderId(null);
     }
   }
 
@@ -1972,7 +2063,7 @@ function App() {
                       <p className="eyebrow">Histórico do pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
-                        Requisições entregues sao consideradas finalizadas e ficam arquivadas aqui.
+                        Requisições finalizadas sao consideradas encerradas e ficam arquivadas aqui.
                       </p>
                     </div>
                   </div>
@@ -2064,7 +2155,7 @@ function App() {
                       <p className="eyebrow">Histórico</p>
                       <h1 className="page-title">Requisições finalizadas</h1>
                       <p className="description">
-                        Aqui ficam os pedidos entregues, considerados concluidos.
+                        Aqui ficam os pedidos finalizados, considerados concluidos.
                       </p>
                     </div>
                   </div>
@@ -2126,6 +2217,7 @@ function App() {
                         <span>Itens</span>
                         <span>urgência</span>
                         <span>Status</span>
+                        <span>Acao</span>
                       </div>
 
                       <div className="orders-table__body">
@@ -2156,6 +2248,23 @@ function App() {
                                 {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
                               </span>
                               <span className="status-chip">{formatOrderStatus(order.status)}</span>
+                              <span>
+                                {userCanReopenOrder ? (
+                                  <button
+                                    type="button"
+                                    className="button button--ghost"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleReopenOrder(order);
+                                    }}
+                                    disabled={reopeningOrderId === order.id}
+                                  >
+                                    {reopeningOrderId === order.id ? 'Reabrindo...' : 'Reabrir'}
+                                  </button>
+                                ) : (
+                                  '-'
+                                )}
+                              </span>
                             </article>
                           ))
                         )}

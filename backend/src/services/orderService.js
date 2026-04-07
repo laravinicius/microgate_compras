@@ -3,7 +3,6 @@ import { sendBuyerNotification } from '../utils/email.js';
 
 const statusAliases = {
   pendente: ['pendente', 'pending'],
-  pending: ['pendente', 'pending'],
   'comprado/aguardando entrega': [
     'comprado/aguardando entrega',
     'comprado',
@@ -11,40 +10,33 @@ const statusAliases = {
     'aguardando entrega',
     'waiting_delivery'
   ],
-  comprado: [
-    'comprado/aguardando entrega',
-    'comprado',
-    'purchased',
-    'aguardando entrega',
-    'waiting_delivery'
-  ],
-  purchased: [
-    'comprado/aguardando entrega',
-    'comprado',
-    'purchased',
-    'aguardando entrega',
-    'waiting_delivery'
-  ],
-  'aguardando entrega': [
-    'comprado/aguardando entrega',
-    'comprado',
-    'purchased',
-    'aguardando entrega',
-    'waiting_delivery'
-  ],
-  waiting_delivery: [
-    'comprado/aguardando entrega',
-    'comprado',
-    'purchased',
-    'aguardando entrega',
-    'waiting_delivery'
-  ],
-  entregue: ['entregue', 'delivered'],
-  delivered: ['entregue', 'delivered'],
+  finalizado: ['finalizado', 'entregue', 'delivered'],
   cancelado: ['cancelado', 'cancelled'],
-  cancelled: ['cancelado', 'cancelled'],
   email_pending: ['email_pending', 'pendente email']
 };
+
+const statusCanonicalMap = {
+  pending: 'pendente',
+  pendente: 'pendente',
+  purchased: 'comprado/aguardando entrega',
+  comprado: 'comprado/aguardando entrega',
+  'aguardando entrega': 'comprado/aguardando entrega',
+  waiting_delivery: 'comprado/aguardando entrega',
+  'comprado/aguardando entrega': 'comprado/aguardando entrega',
+  delivered: 'finalizado',
+  entregue: 'finalizado',
+  finalizado: 'finalizado',
+  cancelled: 'cancelado',
+  cancelado: 'cancelado',
+  email_pending: 'email_pending',
+  'pendente email': 'email_pending'
+};
+
+function normalizeOrderStatus(status) {
+  const normalizedStatus = String(status ?? '').trim().toLowerCase();
+
+  return statusCanonicalMap[normalizedStatus] || normalizedStatus;
+}
 
 function normalizeOrder(row) {
   return {
@@ -60,7 +52,7 @@ function normalizeOrder(row) {
     relatedOs: row.related_os,
     withoutOs: row.without_os,
     compraParaguai: Boolean(row.compra_paraguai),
-    status: row.status,
+    status: normalizeOrderStatus(row.status),
     estimatedDelivery: row.estimated_delivery,
     comments: row.comments ?? '',
     total: Number(row.total),
@@ -136,7 +128,7 @@ async function insertOrderComment(client, { orderId, userId, comment }) {
 
 async function listOrders(filters = {}) {
   const normalizedId = String(filters.id ?? '').trim();
-  const normalizedStatus = String(filters.status ?? '').trim();
+  const normalizedStatus = normalizeOrderStatus(filters.status);
   const normalizedRequesterId = String(filters.requesterId ?? '').trim();
   const whereClauses = [];
   const params = [];
@@ -642,6 +634,60 @@ async function updateOrder(
   }
 }
 
+async function reopenOrder(orderId, { userId, reason }) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const currentOrder = await getOrderById(orderId);
+
+    if (!currentOrder) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    if (currentOrder.status !== 'finalizado' && currentOrder.status !== 'cancelado') {
+      await client.query('ROLLBACK');
+      return {
+        error: 'ORDER_NOT_FINISHED'
+      };
+    }
+
+    const normalizedReason = String(reason ?? '').trim();
+
+    await client.query(
+      `
+        UPDATE orders
+        SET status = 'pendente'
+        WHERE id = $1
+      `,
+      [orderId]
+    );
+
+    await insertOrderComment(client, {
+      orderId,
+      userId,
+      comment: normalizedReason
+    });
+
+    await insertOrderHistory(client, {
+      orderId,
+      userId,
+      description: `Status alterado de "${currentOrder.status}" para "pendente" por reabertura.`
+    });
+
+    await client.query('COMMIT');
+
+    return getOrderById(orderId);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function deleteOrder(orderId) {
   const result = await pool.query(
     `
@@ -655,4 +701,11 @@ async function deleteOrder(orderId) {
   return Boolean(result.rowCount);
 }
 
-export { createOrder, deleteOrder, getOrderById, listOrders, updateOrder };
+export {
+  createOrder,
+  deleteOrder,
+  getOrderById,
+  listOrders,
+  reopenOrder,
+  updateOrder
+};

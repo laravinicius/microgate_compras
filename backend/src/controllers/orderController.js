@@ -3,6 +3,7 @@ import {
   deleteOrder,
   getOrderById,
   listOrders,
+  reopenOrder,
   updateOrder
 } from '../services/orderService.js';
 import {
@@ -16,13 +17,17 @@ const allowedStatuses = [
   'comprado/aguardando entrega',
   'comprado',
   'aguardando entrega',
-  'entregue',
+  'finalizado',
   'cancelado'
 ];
 
 function normalizeStatus(status) {
   if (status === 'comprado' || status === 'aguardando entrega') {
     return 'comprado/aguardando entrega';
+  }
+
+  if (status === 'entregue' || status === 'delivered') {
+    return 'finalizado';
   }
 
   return status;
@@ -251,6 +256,13 @@ async function updateOrderHandler(request, response, next) {
       return;
     }
 
+    if (currentOrder.status === 'finalizado' || currentOrder.status === 'cancelado') {
+      response.status(409).json({
+        error: 'Pedido finalizado ou cancelado nao pode ser alterado.'
+      });
+      return;
+    }
+
     const relatedOsResult = parseRelatedOsInput(relatedOsRaw);
 
     const normalizedItems = items.map((item) => {
@@ -295,7 +307,24 @@ async function updateOrderHandler(request, response, next) {
 
 async function deleteOrderHandler(request, response, next) {
   try {
-    const deleted = await deleteOrder(Number(request.params.id));
+    const orderId = Number(request.params.id);
+    const currentOrder = await getOrderById(orderId);
+
+    if (!currentOrder) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    if (currentOrder.status === 'finalizado' || currentOrder.status === 'cancelado') {
+      response.status(409).json({
+        error: 'Pedido finalizado ou cancelado nao pode ser excluido.'
+      });
+      return;
+    }
+
+    const deleted = await deleteOrder(orderId);
 
     if (!deleted) {
       response.status(404).json({
@@ -310,10 +339,55 @@ async function deleteOrderHandler(request, response, next) {
   }
 }
 
+async function reopenOrderHandler(request, response, next) {
+  try {
+    const orderId = Number(request.params.id);
+    const reason = String(request.body?.reason ?? '').trim();
+
+    if (!reason) {
+      response.status(400).json({
+        error: 'Informe o motivo da reabertura.'
+      });
+      return;
+    }
+
+    if (!isAdministrator(request.user) && !isBuyer(request.user)) {
+      response.status(403).json({
+        error: 'Apenas comprador ou administrador pode reabrir pedidos.'
+      });
+      return;
+    }
+
+    const result = await reopenOrder(orderId, {
+      userId: request.user.id,
+      reason
+    });
+
+    if (!result) {
+      response.status(404).json({
+        error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    if (result.error === 'ORDER_NOT_FINISHED') {
+      response.status(409).json({
+        error: 'Somente pedidos finalizados ou cancelados podem ser reabertos.'
+      });
+      return;
+    }
+
+    response.json({ order: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export {
   createOrderHandler,
   deleteOrderHandler,
   getOrderDetailsHandler,
   listOrdersHandler,
+  reopenOrderHandler,
   updateOrderHandler
 };
