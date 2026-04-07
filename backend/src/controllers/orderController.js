@@ -193,6 +193,7 @@ async function updateOrderHandler(request, response, next) {
     const status = String(request.body?.status ?? '').trim().toLowerCase();
     const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
     const comments = String(request.body?.comments ?? '').trim();
+    const compraParaguaiRaw = request.body?.compraParaguai;
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
 
     if (!buyerId) {
@@ -227,13 +228,18 @@ async function updateOrderHandler(request, response, next) {
       return;
     }
 
+    const compraParaguai =
+      compraParaguaiRaw === undefined
+        ? Boolean(currentOrder.compraParaguai)
+        : Boolean(compraParaguaiRaw);
+
     const normalizedItems = items.map((item) => {
       const productValue = toCurrencyNumber(item.productValue);
 
       return {
         id: Number(item.id),
         productValue,
-        saleValue: calculateSaleValue(productValue, Boolean(currentOrder.compraParaguai)),
+        saleValue: calculateSaleValue(productValue, compraParaguai),
         passedValue: toCurrencyNumber(item.passedValue)
       };
     });
@@ -256,6 +262,7 @@ async function updateOrderHandler(request, response, next) {
       status,
       estimatedDelivery: estimatedDelivery || null,
       comments,
+      compraParaguai,
       items: normalizedItems
     });
     response.json({ order });

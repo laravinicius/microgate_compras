@@ -98,6 +98,20 @@ function calculateSaleValue(productValue, compraParaguai = false) {
   return Number(formatCurrencyValue(normalizedProductValue * finalMultiplier));
 }
 
+function recalculateOrderItems(items, compraParaguai = false) {
+  return items.map((item) => {
+    const productValue = Number(item.productValue || 0);
+    const quantity = Number(item.quantity || 0);
+    const saleValue = calculateSaleValue(productValue, compraParaguai);
+
+    return {
+      ...item,
+      saleValue,
+      passedValue: Number(formatCurrencyValue(saleValue * quantity))
+    };
+  });
+}
+
 function formatDateTime(value) {
   if (!value) {
     return '-';
@@ -356,6 +370,18 @@ function OrderDetailContent({
               }
               disabled={!selectedOrderCanEdit}
             />
+          </label>
+
+          <label className="checkbox-field checkbox-field--inline-row">
+            <input
+              type="checkbox"
+              checked={Boolean(selectedOrder.compraParaguai)}
+              onChange={(event) =>
+                updateSelectedOrderField('compraParaguai', event.target.checked)
+              }
+              disabled={!selectedOrderCanEdit}
+            />
+            <span>Compra Paraguai</span>
           </label>
         </div>
       </section>
@@ -674,6 +700,7 @@ function App() {
 
       setSelectedOrder({
         ...data.order,
+        compraParaguai: Boolean(data.order.compraParaguai),
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
         commentsHistory: data.order.commentsHistory || []
@@ -688,10 +715,27 @@ function App() {
 
   function updateSelectedOrderField(field, value) {
     setOrderActionMessage('');
-    setSelectedOrder((current) => ({
-      ...current,
-      [field]: value
-    }));
+    setSelectedOrder((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextOrder = {
+        ...current,
+        [field]: value
+      };
+
+      if (field === 'compraParaguai') {
+        nextOrder.items = recalculateOrderItems(current.items, value);
+        nextOrder.total = Number(
+          formatCurrencyValue(
+            nextOrder.items.reduce((sum, item) => sum + Number(item.passedValue || 0), 0)
+          )
+        );
+      }
+
+      return nextOrder;
+    });
   }
 
   function updateSelectedOrderCommentDraft(value) {
@@ -717,9 +761,11 @@ function App() {
         };
 
         if (field === 'productValue') {
-          updatedItem.saleValue = calculateSaleValue(
-            Number(value || 0),
-            Boolean(current.compraParaguai)
+          updatedItem.saleValue = calculateSaleValue(Number(value || 0), current.compraParaguai);
+          updatedItem.passedValue = Number(
+            formatCurrencyValue(
+              Number(updatedItem.saleValue || 0) * Number(updatedItem.quantity || 0)
+            )
           );
         }
 
@@ -1098,6 +1144,7 @@ function App() {
           status: selectedOrder.status,
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
           comments: commentToSave,
+          compraParaguai: selectedOrder.compraParaguai,
           items: selectedOrder.items.map((item) => ({
             id: item.id,
             productValue: Number(item.productValue || 0),

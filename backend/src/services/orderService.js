@@ -447,7 +447,10 @@ async function createOrder({
   }
 }
 
-async function updateOrder(orderId, { userId, buyerId, status, estimatedDelivery, comments, items }) {
+async function updateOrder(
+  orderId,
+  { userId, buyerId, status, estimatedDelivery, comments, compraParaguai, items }
+) {
   const client = await pool.connect();
 
   try {
@@ -470,11 +473,12 @@ async function updateOrder(orderId, { userId, buyerId, status, estimatedDelivery
           status = $3,
           estimated_delivery = $4,
           comments = $5,
-          total = $6
+          compra_paraguai = $6,
+          total = $7
         WHERE id = $1
         RETURNING id
       `,
-      [orderId, buyerId, status, estimatedDelivery, comments, total]
+      [orderId, buyerId, status, estimatedDelivery, comments, compraParaguai, total]
     );
 
     if (!orderResult.rowCount) {
@@ -524,6 +528,12 @@ async function updateOrder(orderId, { userId, buyerId, status, estimatedDelivery
 
     if (Number(currentOrder.buyerId || 0) !== Number(buyerId || 0)) {
       historyEntries.push('Comprador alterado.');
+    }
+
+    if (Boolean(currentOrder.compraParaguai) !== Boolean(compraParaguai)) {
+      historyEntries.push(
+        Boolean(compraParaguai) ? 'Compra Paraguai ativada.' : 'Compra Paraguai desativada.'
+      );
     }
 
     for (const item of items) {
