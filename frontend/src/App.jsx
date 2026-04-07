@@ -1966,7 +1966,7 @@ function App() {
                       <p className="eyebrow">Painel de pedidos</p>
                       <h1 className="page-title">Lista de pedidos</h1>
                       <p className="description">
-                        Consulte pedidos ativos, andamento de compras e movimentacoes recentes.
+                        Consulte pedidos ativos, andamento de compras e movimentações recentes.
                       </p>
                     </div>
                   </div>
