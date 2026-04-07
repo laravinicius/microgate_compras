@@ -76,6 +76,7 @@ function normalizeOrderItem(row) {
     productName: row.product_name,
     productLink: row.product_link ?? '',
     notes: row.notes ?? '',
+    compraParaguai: Boolean(row.compra_paraguai),
     quantity: Number(row.quantity),
     productValue: Number(row.product_value),
     saleValue: Number(row.sale_value),
@@ -253,6 +254,7 @@ async function getOrderById(orderId) {
         product_name,
         product_link,
         notes,
+        compra_paraguai,
         quantity,
         product_value,
         sale_value,
@@ -317,7 +319,6 @@ async function createOrder({
   requestName,
   urgency,
   relatedOs,
-  compraParaguai,
   items
 }) {
   const client = await pool.connect();
@@ -326,6 +327,7 @@ async function createOrder({
     await client.query('BEGIN');
 
     const total = items.reduce((sum, item) => sum + Number(item.passedValue), 0);
+    const hasCompraParaguai = items.some((item) => Boolean(item.compraParaguai));
 
     const orderResult = await client.query(
       `
@@ -364,7 +366,7 @@ async function createOrder({
         urgency,
         relatedOs,
         relatedOs === null || relatedOs === undefined,
-        Boolean(compraParaguai),
+        hasCompraParaguai,
         total
       ]
     );
@@ -379,18 +381,20 @@ async function createOrder({
             product_name,
             product_link,
             notes,
+            compra_paraguai,
             quantity,
             product_value,
             sale_value,
             passed_value
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `,
         [
           order.id,
           item.productName,
           item.productLink,
           item.notes,
+          Boolean(item.compraParaguai),
           item.quantity,
           item.productValue,
           item.saleValue,
@@ -487,7 +491,7 @@ async function createOrder({
 
 async function updateOrder(
   orderId,
-  { userId, buyerId, status, estimatedDelivery, comments, relatedOs, compraParaguai, items }
+  { userId, buyerId, status, estimatedDelivery, comments, relatedOs, items }
 ) {
   const client = await pool.connect();
 
@@ -502,6 +506,7 @@ async function updateOrder(
     }
 
     const total = items.reduce((sum, item) => sum + Number(item.passedValue), 0);
+    const hasCompraParaguai = items.some((item) => Boolean(item.compraParaguai));
     const withoutOs = relatedOs === null || relatedOs === undefined || relatedOs === '';
 
     const orderResult = await client.query(
@@ -527,7 +532,7 @@ async function updateOrder(
         comments,
         relatedOs,
         withoutOs,
-        compraParaguai,
+        hasCompraParaguai,
         total
       ]
     );
@@ -544,10 +549,11 @@ async function updateOrder(
           SET
             product_value = $2,
             sale_value = $3,
-            passed_value = $4
+            passed_value = $4,
+            compra_paraguai = $5
           WHERE id = $1
         `,
-        [item.id, item.productValue, item.saleValue, item.passedValue]
+        [item.id, item.productValue, item.saleValue, item.passedValue, Boolean(item.compraParaguai)]
       );
     }
 
@@ -587,12 +593,6 @@ async function updateOrder(
       );
     }
 
-    if (Boolean(currentOrder.compraParaguai) !== Boolean(compraParaguai)) {
-      historyEntries.push(
-        Boolean(compraParaguai) ? 'Compra Paraguai ativada.' : 'Compra Paraguai desativada.'
-      );
-    }
-
     for (const item of items) {
       const previousItem = currentOrder.items.find((currentItem) => currentItem.id === item.id);
 
@@ -609,6 +609,12 @@ async function updateOrder(
       if (Number(previousItem.passedValue) !== Number(item.passedValue)) {
         historyEntries.push(
           `Item "${previousItem.productName}": valor repassado alterado para ${item.passedValue.toFixed(2)}.`
+        );
+      }
+
+      if (Boolean(previousItem.compraParaguai) !== Boolean(item.compraParaguai)) {
+        historyEntries.push(
+          `Item "${previousItem.productName}": Compra Paraguai ${Boolean(item.compraParaguai) ? 'ativada' : 'desativada'}.`
         );
       }
     }

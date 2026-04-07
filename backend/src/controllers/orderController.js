@@ -85,6 +85,7 @@ function validateItems(items, allowPartial = false) {
 
     const productValue = Number(item.productValue);
     const passedValue = Number(item.passedValue ?? 0);
+    const compraParaguai = item.compraParaguai;
 
     if (!Number.isFinite(productValue) || productValue < 0) {
       return 'O valor do produto deve ser um numero valido.';
@@ -92,6 +93,10 @@ function validateItems(items, allowPartial = false) {
 
     if (!Number.isFinite(passedValue) || passedValue < 0) {
       return 'O valor repassado deve ser um numero valido.';
+    }
+
+    if (compraParaguai !== undefined && typeof compraParaguai !== 'boolean') {
+      return 'O campo Compra Paraguai do item deve ser verdadeiro ou falso.';
     }
   }
 
@@ -103,7 +108,6 @@ async function createOrderHandler(request, response, next) {
     const requestName = String(request.body?.requestName ?? '').trim();
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
-    const compraParaguai = Boolean(request.body?.compraParaguai);
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
 
@@ -141,12 +145,14 @@ async function createOrderHandler(request, response, next) {
 
     const normalizedItems = items.map((item) => {
       const productValue = toCurrencyNumber(item.productValue);
+      const compraParaguai = Boolean(item.compraParaguai);
       const saleValue = calculateSaleValue(productValue, compraParaguai);
 
       return {
         productName: String(item.productName ?? '').trim(),
         productLink: String(item.productLink ?? '').trim(),
         notes: String(item.notes ?? '').trim(),
+        compraParaguai,
         quantity: Number(item.quantity),
         productValue,
         saleValue,
@@ -160,7 +166,6 @@ async function createOrderHandler(request, response, next) {
       buyerId,
       urgency,
       relatedOs: relatedOsResult.relatedOs,
-      compraParaguai,
       items: normalizedItems
     });
 
@@ -211,7 +216,6 @@ async function updateOrderHandler(request, response, next) {
     const status = normalizeStatus(String(request.body?.status ?? '').trim().toLowerCase());
     const estimatedDelivery = String(request.body?.estimatedDelivery ?? '').trim();
     const comments = String(request.body?.comments ?? '').trim();
-    const compraParaguaiRaw = request.body?.compraParaguai;
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = Array.isArray(request.body?.items) ? request.body.items : [];
 
@@ -247,18 +251,15 @@ async function updateOrderHandler(request, response, next) {
       return;
     }
 
-    const compraParaguai =
-      compraParaguaiRaw === undefined
-        ? Boolean(currentOrder.compraParaguai)
-        : Boolean(compraParaguaiRaw);
-
     const relatedOsResult = parseRelatedOsInput(relatedOsRaw);
 
     const normalizedItems = items.map((item) => {
       const productValue = toCurrencyNumber(item.productValue);
+      const compraParaguai = Boolean(item.compraParaguai);
 
       return {
         id: Number(item.id),
+        compraParaguai,
         productValue,
         saleValue: calculateSaleValue(productValue, compraParaguai),
         passedValue: toCurrencyNumber(item.passedValue)
@@ -284,7 +285,6 @@ async function updateOrderHandler(request, response, next) {
       estimatedDelivery: estimatedDelivery || null,
       comments,
       relatedOs: relatedOsResult.relatedOs,
-      compraParaguai,
       items: normalizedItems
     });
     response.json({ order });

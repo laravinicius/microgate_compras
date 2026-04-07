@@ -68,6 +68,7 @@ const createEmptyRequestItem = () => ({
   productName: '',
   productLink: '',
   notes: '',
+  compraParaguai: false,
   quantity: 1,
   productValue: '',
   saleValue: '0.00'
@@ -78,7 +79,6 @@ const createEmptyRequestForm = () => ({
   buyerId: null,
   urgency: 'normal',
   relatedOs: '',
-  compraParaguai: false,
   items: [createEmptyRequestItem()]
 });
 
@@ -114,20 +114,6 @@ function calculateSaleValue(productValue, compraParaguai = false) {
   const finalMultiplier = compraParaguai ? baseMultiplier * 1.25 : baseMultiplier;
 
   return Number(formatCurrencyValue(normalizedProductValue * finalMultiplier));
-}
-
-function recalculateOrderItems(items, compraParaguai = false) {
-  return items.map((item) => {
-    const productValue = Number(item.productValue || 0);
-    const quantity = Number(item.quantity || 0);
-    const saleValue = calculateSaleValue(productValue, compraParaguai);
-
-    return {
-      ...item,
-      saleValue,
-      passedValue: Number(formatCurrencyValue(saleValue * quantity))
-    };
-  });
 }
 
 function formatDateTime(value) {
@@ -402,18 +388,6 @@ function OrderDetailContent({
               disabled={!selectedOrderCanEdit}
             />
           </label>
-
-          <label className="checkbox-field checkbox-field--inline-row">
-            <input
-              type="checkbox"
-              checked={Boolean(selectedOrder.compraParaguai)}
-              onChange={(event) =>
-                updateSelectedOrderField('compraParaguai', event.target.checked)
-              }
-              disabled={!selectedOrderCanEdit}
-            />
-            <span>Compra Paraguai</span>
-          </label>
         </div>
       </section>
 
@@ -430,6 +404,7 @@ function OrderDetailContent({
             <span>Qtd</span>
             <span>Detalhes</span>
             <span>Obs</span>
+            <span>Compra PY</span>
             <span>Valor do produto</span>
             <span>Valor da venda</span>
             <span>Valor repassado</span>
@@ -449,6 +424,17 @@ function OrderDetailContent({
                   Abrir link
                 </button>
                 <span>{item.notes || '-'}</span>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.compraParaguai)}
+                    onChange={(event) =>
+                      updateSelectedOrderItem(item.id, 'compraParaguai', event.target.checked)
+                    }
+                    disabled={!selectedOrderCanEdit}
+                  />
+                  <span>Sim</span>
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -621,12 +607,12 @@ function App() {
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
     Boolean(requestForm.relatedOs.trim()) ||
-    requestForm.compraParaguai ||
     requestForm.items.some(
       (item) =>
         item.productName.trim() ||
         item.productLink.trim() ||
         item.notes.trim() ||
+        item.compraParaguai ||
         String(item.quantity) !== '1' ||
         String(item.productValue).trim()
     );
@@ -816,8 +802,7 @@ function App() {
       setSelectedOrder({
         ...data.order,
         status: normalizeOrderStatus(data.order.status),
-        compraParaguai: Boolean(data.order.compraParaguai),
-          relatedOs: data.order.relatedOs ? String(data.order.relatedOs) : '',
+        relatedOs: data.order.relatedOs ? String(data.order.relatedOs) : '',
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
         history: data.order.history || [],
         commentsHistory: data.order.commentsHistory || []
@@ -841,15 +826,6 @@ function App() {
         ...current,
         [field]: value
       };
-
-      if (field === 'compraParaguai') {
-        nextOrder.items = recalculateOrderItems(current.items, value);
-        nextOrder.total = Number(
-          formatCurrencyValue(
-            nextOrder.items.reduce((sum, item) => sum + Number(item.passedValue || 0), 0)
-          )
-        );
-      }
 
       if (field === 'relatedOs') {
         nextOrder.relatedOs = value;
@@ -881,8 +857,11 @@ function App() {
           [field]: value
         };
 
-        if (field === 'productValue') {
-          updatedItem.saleValue = calculateSaleValue(Number(value || 0), current.compraParaguai);
+        if (field === 'productValue' || field === 'compraParaguai') {
+          updatedItem.saleValue = calculateSaleValue(
+            Number(updatedItem.productValue || 0),
+            Boolean(updatedItem.compraParaguai)
+          );
           updatedItem.passedValue = Number(
             formatCurrencyValue(
               Number(updatedItem.saleValue || 0) * Number(updatedItem.quantity || 0)
@@ -1001,9 +980,12 @@ function App() {
           [field]: value
         };
 
-        if (field === 'productValue') {
+        if (field === 'productValue' || field === 'compraParaguai') {
           updatedItem.saleValue = formatCurrencyValue(
-            calculateSaleValue(Number(value || 0), Boolean(current.compraParaguai))
+            calculateSaleValue(
+              Number(updatedItem.productValue || 0),
+              Boolean(updatedItem.compraParaguai)
+            )
           );
         }
 
@@ -1199,11 +1181,11 @@ function App() {
           buyerId: requestForm.buyerId,
           urgency: requestForm.urgency,
           relatedOs: requestForm.relatedOs,
-          compraParaguai: requestForm.compraParaguai,
           items: requestForm.items.map((item) => ({
             productName: item.productName,
             productLink: item.productLink,
             notes: item.notes,
+            compraParaguai: Boolean(item.compraParaguai),
             quantity: Number(item.quantity),
             productValue: Number(item.productValue || 0)
           }))
@@ -1349,9 +1331,9 @@ function App() {
           estimatedDelivery: selectedOrder.estimatedDelivery || '',
           comments: commentToSave,
           relatedOs: String(selectedOrder.relatedOs ?? ''),
-          compraParaguai: selectedOrder.compraParaguai,
           items: selectedOrder.items.map((item) => ({
             id: item.id,
+            compraParaguai: Boolean(item.compraParaguai),
             productValue: Number(item.productValue || 0),
             passedValue: Number(item.passedValue || 0)
           }))
@@ -1646,26 +1628,6 @@ function App() {
                 </label>
               </div>
 
-                <label className="checkbox-field checkbox-field--inline-row">
-                  <input
-                    type="checkbox"
-                    checked={requestForm.compraParaguai}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        compraParaguai: event.target.checked,
-                        items: current.items.map((item) => ({
-                          ...item,
-                          saleValue: formatCurrencyValue(
-                            calculateSaleValue(Number(item.productValue || 0), event.target.checked)
-                          )
-                        }))
-                      }))
-                    }
-                  />
-                  <span>Compra Paraguai</span>
-                </label>
-
                 <div className="items-header">
                   <div>
                     <p className="eyebrow">Itens</p>
@@ -1728,11 +1690,23 @@ function App() {
                         />
                       </label>
 
+                      <label className="checkbox-field checkbox-field--inline-row">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.compraParaguai)}
+                          onChange={(event) =>
+                            updateRequestItem(index, 'compraParaguai', event.target.checked)
+                          }
+                        />
+                        <span>Compra Paraguai</span>
+                      </label>
+
                       <label>
                         <span>Qtd</span>
                         <input
                           type="number"
                           min="1"
+                          max="9999"
                           step="1"
                           value={item.quantity}
                           onChange={(event) =>

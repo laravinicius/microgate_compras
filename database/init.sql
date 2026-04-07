@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_name VARCHAR(180) NOT NULL,
   product_link TEXT,
   notes TEXT,
+  compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE,
   quantity INTEGER NOT NULL DEFAULT 1,
   product_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
   sale_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -114,6 +115,9 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS passed_value NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE;
 
 UPDATE order_items
 SET passed_value = sale_value * quantity
