@@ -31,7 +31,13 @@ function verifyToken(token) {
     .update(serializedPayload)
     .digest('base64url');
 
-  if (signature !== expectedSignature) {
+  const signatureBuffer = Buffer.from(signature);
+  const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+  if (
+    signatureBuffer.length !== expectedSignatureBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer)
+  ) {
     return null;
   }
 

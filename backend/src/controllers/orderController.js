@@ -108,6 +108,22 @@ function validateItems(items, allowPartial = false) {
   return '';
 }
 
+function canViewOrder(user, order) {
+  if (isAdministrator(user)) {
+    return true;
+  }
+
+  if (isBuyer(user)) {
+    return Number(order.buyerId) === Number(user.id);
+  }
+
+  if (isRequester(user)) {
+    return Number(order.userId) === Number(user.id);
+  }
+
+  return false;
+}
+
 async function createOrderHandler(request, response, next) {
   try {
     const requestName = String(request.body?.requestName ?? '').trim();
@@ -184,11 +200,27 @@ async function listOrdersHandler(request, response, next) {
   try {
     const id = String(request.query?.id ?? '').trim();
     const status = String(request.query?.status ?? '').trim().toLowerCase();
-    const requesterId = String(request.query?.requesterId ?? '').trim();
+    const requestedRequesterId = String(request.query?.requesterId ?? '').trim();
+    const requestedBuyerId = String(request.query?.buyerId ?? '').trim();
+
+    let requesterId = requestedRequesterId;
+    let buyerId = requestedBuyerId;
+
+    if (isRequester(request.user)) {
+      requesterId = String(request.user.id);
+      buyerId = '';
+    }
+
+    if (isBuyer(request.user)) {
+      buyerId = String(request.user.id);
+      requesterId = requestedRequesterId;
+    }
+
     const orders = await listOrders({
       id,
       status,
-      requesterId
+      requesterId,
+      buyerId
     });
 
     response.json({ orders });
@@ -204,6 +236,13 @@ async function getOrderDetailsHandler(request, response, next) {
     if (!order) {
       response.status(404).json({
         error: 'Pedido nao encontrado.'
+      });
+      return;
+    }
+
+    if (!canViewOrder(request.user, order)) {
+      response.status(403).json({
+        error: 'Voce nao tem permissao para visualizar este pedido.'
       });
       return;
     }

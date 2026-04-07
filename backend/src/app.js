@@ -1,18 +1,20 @@
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
 
 import { env } from './config/env.js';
 import { apiRouter } from './routes/index.js';
 
 const app = express();
 
+app.use(helmet());
 app.use(
   cors({
     origin: env.frontendUrl,
     credentials: false
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '200kb' }));
 
 app.get('/', (_request, response) => {
   response.json({
@@ -29,7 +31,11 @@ app.use((request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
-  console.error(error);
+  if (env.nodeEnv === 'production') {
+    console.error(`[${new Date().toISOString()}] ${error?.message ?? 'Erro interno'}`);
+  } else {
+    console.error(error);
+  }
 
   if (error?.code === '23505') {
     response.status(409).json({

@@ -130,6 +130,7 @@ async function listOrders(filters = {}) {
   const normalizedId = String(filters.id ?? '').trim();
   const normalizedStatus = normalizeOrderStatus(filters.status);
   const normalizedRequesterId = String(filters.requesterId ?? '').trim();
+  const normalizedBuyerId = String(filters.buyerId ?? '').trim();
   const whereClauses = [];
   const params = [];
 
@@ -147,6 +148,11 @@ async function listOrders(filters = {}) {
   if (/^\d+$/.test(normalizedRequesterId)) {
     params.push(Number(normalizedRequesterId));
     whereClauses.push(`o.user_id = $${params.length}`);
+  }
+
+  if (/^\d+$/.test(normalizedBuyerId)) {
+    params.push(Number(normalizedBuyerId));
+    whereClauses.push(`o.buyer_id = $${params.length}`);
   }
 
   const result = await pool.query(

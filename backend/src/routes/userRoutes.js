@@ -15,8 +15,7 @@ import {
 const userRouter = Router();
 
 userRouter.use(requireAuth, requirePasswordChangeComplete);
-userRouter.get('/users', getUsers);
-userRouter.use(requireAdmin);
+userRouter.get('/users', requireAdmin, getUsers);
 userRouter.post('/users', createUserHandler);
 userRouter.put('/users/:id', updateUserHandler);
 userRouter.delete('/users/:id', deleteUserHandler);
