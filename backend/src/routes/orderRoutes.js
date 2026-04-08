@@ -22,6 +22,6 @@ orderRouter.get('/orders/:id', getOrderDetailsHandler);
 orderRouter.post('/orders', createOrderHandler);
 orderRouter.put('/orders/:id', updateOrderHandler);
 orderRouter.put('/orders/:id/reopen', reopenOrderHandler);
-orderRouter.delete('/orders/:id', requireAdmin, deleteOrderHandler);
+orderRouter.delete('/orders/:id', deleteOrderHandler);
 
 export { orderRouter };

@@ -109,19 +109,7 @@ function validateItems(items, allowPartial = false) {
 }
 
 function canViewOrder(user, order) {
-  if (isAdministrator(user)) {
-    return true;
-  }
-
-  if (isBuyer(user)) {
-    return Number(order.buyerId) === Number(user.id);
-  }
-
-  if (isRequester(user)) {
-    return Number(order.userId) === Number(user.id);
-  }
-
-  return false;
+  return true;
 }
 
 async function createOrderHandler(request, response, next) {
@@ -200,21 +188,8 @@ async function listOrdersHandler(request, response, next) {
   try {
     const id = String(request.query?.id ?? '').trim();
     const status = String(request.query?.status ?? '').trim().toLowerCase();
-    const requestedRequesterId = String(request.query?.requesterId ?? '').trim();
-    const requestedBuyerId = String(request.query?.buyerId ?? '').trim();
-
-    let requesterId = requestedRequesterId;
-    let buyerId = requestedBuyerId;
-
-    if (isRequester(request.user)) {
-      requesterId = String(request.user.id);
-      buyerId = '';
-    }
-
-    if (isBuyer(request.user)) {
-      buyerId = String(request.user.id);
-      requesterId = requestedRequesterId;
-    }
+    const requesterId = String(request.query?.requesterId ?? '').trim();
+    const buyerId = String(request.query?.buyerId ?? '').trim();
 
     const orders = await listOrders({
       id,
@@ -317,10 +292,7 @@ async function updateOrderHandler(request, response, next) {
       };
     });
 
-    const canUpdateOrder =
-      isAdministrator(request.user) ||
-      isBuyer(request.user) ||
-      (isRequester(request.user) && currentOrder.userId === request.user.id);
+    const canUpdateOrder = true;
 
     if (!canUpdateOrder) {
       response.status(403).json({
@@ -386,13 +358,6 @@ async function reopenOrderHandler(request, response, next) {
     if (!reason) {
       response.status(400).json({
         error: 'Informe o motivo da reabertura.'
-      });
-      return;
-    }
-
-    if (!isAdministrator(request.user) && !isBuyer(request.user)) {
-      response.status(403).json({
-        error: 'Apenas comprador ou administrador pode reabrir pedidos.'
       });
       return;
     }

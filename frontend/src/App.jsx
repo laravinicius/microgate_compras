@@ -203,7 +203,7 @@ function canManageUsers(user) {
 }
 
 function canReopenOrder(user) {
-  return isAdministrator(user) || isBuyer(user);
+  return true;
 }
 
 function getPersistedOrderStatus(order) {
@@ -219,15 +219,11 @@ function canEditOrder(user, order) {
     return false;
   }
 
-  return (
-    isAdministrator(user) ||
-    isBuyer(user) ||
-    (isRequester(user) && Number(order.userId) === Number(user.id))
-  );
+  return true;
 }
 
 function canDeleteOrder(user, order) {
-  if (!isAdministrator(user)) {
+  if (!user || !order) {
     return false;
   }
 
