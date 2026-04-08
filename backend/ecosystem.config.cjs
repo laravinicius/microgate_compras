@@ -9,7 +9,10 @@ module.exports = {
       instances: 1,
       exec_mode: 'fork',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: '4000',
+        FRONTEND_URLS:
+          'https://compras.microgateinformatica.com.br,https://portal.microgateinformatica.com.br,https://restrito.microgateinformatica.com.br'
       }
     }
   ]
