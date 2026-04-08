@@ -285,6 +285,7 @@ async function updateOrderHandler(request, response, next) {
 
       return {
         id: Number(item.id),
+        productLink: String(item.productLink ?? '').trim(),
         compraParaguai,
         productValue,
         saleValue: calculateSaleValue(productValue, compraParaguai),

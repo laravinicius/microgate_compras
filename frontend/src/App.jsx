@@ -424,6 +424,7 @@ function OrderDetailContent({
           <div className="order-items-table__head">
             <span>Produto</span>
             <span>Qtd</span>
+            <span>Link</span>
             <span>Detalhes</span>
             <span>Obs</span>
             <span>Compra PY</span>
@@ -437,14 +438,25 @@ function OrderDetailContent({
               <article key={item.id} className="order-item-row">
                 <strong>{item.productName}</strong>
                 <span>{item.quantity}</span>
-                <button
-                  type="button"
-                  className="button button--ghost"
-                  onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
-                  disabled={!item.productLink}
-                >
-                  Abrir link
-                </button>
+                <div className="order-item-link-field">
+                  <input
+                    type="url"
+                    value={item.productLink}
+                    onChange={(event) =>
+                      updateSelectedOrderItem(item.id, 'productLink', event.target.value)
+                    }
+                    placeholder="https://..."
+                    disabled={!selectedOrderCanEdit}
+                  />
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={() => window.open(item.productLink, '_blank', 'noopener,noreferrer')}
+                    disabled={!item.productLink}
+                  >
+                    Abrir
+                  </button>
+                </div>
                 <span>{item.notes || '-'}</span>
                 <label className="checkbox-field">
                   <input
@@ -1367,6 +1379,7 @@ function App() {
           relatedOs: String(selectedOrder.relatedOs ?? ''),
           items: selectedOrder.items.map((item) => ({
             id: item.id,
+            productLink: item.productLink,
             compraParaguai: Boolean(item.compraParaguai),
             productValue: Number(item.productValue || 0),
             passedValue: Number(item.passedValue || 0)

@@ -812,7 +812,7 @@ input[readonly] {
 .order-items-table__head,
 .order-item-row {
   display: grid;
-  grid-template-columns: 1.15fr 0.38fr 0.62fr 0.95fr 0.78fr 0.8fr 0.82fr 0.9fr;
+  grid-template-columns: 1.15fr 0.38fr 1.2fr 0.95fr 0.78fr 0.8fr 0.82fr 0.9fr 0.9fr;
   gap: 8px;
   align-items: center;
 }
@@ -855,6 +855,11 @@ input[readonly] {
 .order-item-row input,
 .order-item-row .checkbox-field {
   max-width: 100%;
+}
+
+.order-item-link-field {
+  display: grid;
+  gap: 8px;
 }
 
 .order-item-row .checkbox-field {

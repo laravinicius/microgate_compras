@@ -48,5 +48,8 @@ Thumbs.db
 .eslintcache
 .parcel-cache/
 .vite/
+
+# Reload script (local dev only)
+reload.sh
 tmp/
 temp/

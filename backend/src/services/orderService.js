@@ -545,13 +545,21 @@ async function updateOrder(
         `
           UPDATE order_items
           SET
-            product_value = $2,
-            sale_value = $3,
-            passed_value = $4,
-            compra_paraguai = $5
+            product_link = $2,
+            product_value = $3,
+            sale_value = $4,
+            passed_value = $5,
+            compra_paraguai = $6
           WHERE id = $1
         `,
-        [item.id, item.productValue, item.saleValue, item.passedValue, Boolean(item.compraParaguai)]
+        [
+          item.id,
+          item.productLink,
+          item.productValue,
+          item.saleValue,
+          item.passedValue,
+          Boolean(item.compraParaguai)
+        ]
       );
     }
 
@@ -614,6 +622,10 @@ async function updateOrder(
         historyEntries.push(
           `Item "${previousItem.productName}": Compra Paraguai ${Boolean(item.compraParaguai) ? 'ativada' : 'desativada'}.`
         );
+      }
+
+      if ((previousItem.productLink || '') !== (item.productLink || '')) {
+        historyEntries.push(`Item "${previousItem.productName}": link alterado.`);
       }
     }
 
