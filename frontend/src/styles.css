@@ -186,6 +186,74 @@ select option {
   background: rgba(253, 186, 116, 0.78);
 }
 
+.photo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.photo-modal__box {
+  width: min(900px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: minmax(200px, 1fr) auto;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.photo-modal__content {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 14px;
+}
+
+.photo-modal__content img {
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.photo-modal__footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.photo-modal__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.photo-modal__subtitle {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.photo-modal__loading,
+.photo-modal__error {
+  margin: 0;
+  text-align: center;
+}
+
+.photo-modal__error {
+  color: #fecaca;
+}
+
 .site-header {
   position: fixed;
   top: 18px;
@@ -664,6 +732,33 @@ input[readonly] {
   border-radius: 18px;
 }
 
+.item-image-upload {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.item-image-upload input[type='file'] {
+  border: 1px dashed var(--border-strong);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+}
+
+.item-image-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.item-image-preview img {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
 .user-card {
   justify-content: space-between;
 }
@@ -812,7 +907,7 @@ input[readonly] {
 .order-items-table__head,
 .order-item-row {
   display: grid;
-  grid-template-columns: 1.15fr 0.38fr 1.2fr 0.95fr 0.78fr 0.8fr 0.82fr 0.9fr 0.9fr;
+  grid-template-columns: 1.15fr 0.38fr 1.1fr 0.8fr 0.95fr 0.78fr 0.8fr 0.82fr 0.9fr 0.9fr;
   gap: 8px;
   align-items: center;
 }

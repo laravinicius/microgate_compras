@@ -59,6 +59,34 @@ app.use((error, _request, response, _next) => {
     return;
   }
 
+  if (error?.name === 'MulterError') {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      response.status(400).json({
+        error: 'Imagem excede o limite permitido de tamanho.'
+      });
+      return;
+    }
+
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      response.status(400).json({
+        error: 'Quantidade de imagens excede o limite permitido por pedido.'
+      });
+      return;
+    }
+
+    response.status(400).json({
+      error: 'Upload invalido.'
+    });
+    return;
+  }
+
+  if (error?.code === 'UPLOAD_INVALID_FILE_TYPE' || error?.code === 'UPLOAD_INVALID_FIELD') {
+    response.status(400).json({
+      error: error.message || 'Upload invalido.'
+    });
+    return;
+  }
+
   response.status(500).json({
     error: 'Erro interno do servidor.'
   });

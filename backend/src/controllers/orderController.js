@@ -1,6 +1,7 @@
 import {
   createOrder,
   deleteOrder,
+  getOrderItemImage,
   getOrderById,
   listOrders,
   reopenOrder,
@@ -11,6 +12,8 @@ import {
   isBuyer,
   isRequester
 } from '../middlewares/authMiddleware.js';
+import { resolveOrderImagePath } from '../utils/orderImageStorage.js';
+import fs from 'fs/promises';
 
 const allowedStatuses = [
   'pendente',
@@ -109,18 +112,95 @@ function validateItems(items, allowPartial = false) {
 }
 
 function canViewOrder(user, order) {
-  return true;
+  if (!user || !order) {
+    return false;
+  }
+
+  if (isAdministrator(user)) {
+    return true;
+  }
+
+  if (isBuyer(user)) {
+    return Number(user.id) === Number(order.buyerId);
+  }
+
+  if (isRequester(user)) {
+    return Number(user.id) === Number(order.userId);
+  }
+
+  return false;
+}
+
+function parseItemsInput(rawItems) {
+  if (Array.isArray(rawItems)) {
+    return rawItems;
+  }
+
+  if (typeof rawItems === 'string') {
+    try {
+      const parsed = JSON.parse(rawItems);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function mapItemImageUploads(files, totalItems) {
+  const imageMap = new Map();
+
+  for (const file of files) {
+    const match = /^itemImage_(\d+)$/.exec(String(file.fieldname || ''));
+
+    if (!match) {
+      continue;
+    }
+
+    const itemIndex = Number(match[1]);
+
+    if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= totalItems) {
+      const rangeError = new Error('Imagem enviada para item invalido.');
+      rangeError.statusCode = 400;
+      throw rangeError;
+    }
+
+    imageMap.set(itemIndex, file);
+  }
+
+  return imageMap;
+}
+
+async function cleanupUploadedFiles(files) {
+  await Promise.all(
+    files.map(async (file) => {
+      if (!file?.path) {
+        return;
+      }
+
+      try {
+        await fs.unlink(file.path);
+      } catch (_error) {
+        // Ignora limpeza defensiva quando arquivo ja foi removido.
+      }
+    })
+  );
 }
 
 async function createOrderHandler(request, response, next) {
+  const uploadedFiles = request.files ?? [];
+
   try {
     const requestName = String(request.body?.requestName ?? '').trim();
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
-    const items = Array.isArray(request.body?.items) ? request.body.items : [];
+    const items = parseItemsInput(request.body?.items);
+    const imageUploads = mapItemImageUploads(uploadedFiles, items.length);
 
     if (!requestName) {
+      await cleanupUploadedFiles(uploadedFiles);
       response.status(400).json({
         error: 'Informe o nome do pedido.'
       });
@@ -128,6 +208,7 @@ async function createOrderHandler(request, response, next) {
     }
 
     if (!buyerId) {
+      await cleanupUploadedFiles(uploadedFiles);
       response.status(400).json({
         error: 'Selecione um comprador.'
       });
@@ -135,6 +216,7 @@ async function createOrderHandler(request, response, next) {
     }
 
     if (!['normal', 'priority'].includes(urgency)) {
+      await cleanupUploadedFiles(uploadedFiles);
       response.status(400).json({
         error: 'urgência invalida.'
       });
@@ -146,16 +228,18 @@ async function createOrderHandler(request, response, next) {
     const itemValidationError = validateItems(items);
 
     if (itemValidationError) {
+      await cleanupUploadedFiles(uploadedFiles);
       response.status(400).json({
         error: itemValidationError
       });
       return;
     }
 
-    const normalizedItems = items.map((item) => {
+    const normalizedItems = items.map((item, itemIndex) => {
       const productValue = toCurrencyNumber(item.productValue);
       const compraParaguai = Boolean(item.compraParaguai);
       const saleValue = calculateSaleValue(productValue, compraParaguai);
+      const imageUpload = imageUploads.get(itemIndex);
 
       return {
         productName: String(item.productName ?? '').trim(),
@@ -165,7 +249,10 @@ async function createOrderHandler(request, response, next) {
         quantity: Number(item.quantity),
         productValue,
         saleValue,
-        passedValue: toCurrencyNumber(saleValue * Number(item.quantity))
+        passedValue: toCurrencyNumber(saleValue * Number(item.quantity)),
+        imageKey: imageUpload?.filename ?? null,
+        imageMimeType: imageUpload?.mimetype ?? null,
+        imageSizeBytes: Number(imageUpload?.size ?? 0) || null
       };
     });
 
@@ -179,6 +266,61 @@ async function createOrderHandler(request, response, next) {
     });
 
     response.status(201).json({ order });
+  } catch (error) {
+    await cleanupUploadedFiles(uploadedFiles);
+    next(error);
+  }
+}
+
+async function getOrderItemImageHandler(request, response, next) {
+  try {
+    const orderId = Number(request.params.id);
+    const itemId = Number(request.params.itemId);
+
+    if (!Number.isInteger(orderId) || !Number.isInteger(itemId)) {
+      response.status(400).json({
+        error: 'Identificadores invalidos.'
+      });
+      return;
+    }
+
+    const itemImage = await getOrderItemImage({ orderId, itemId });
+
+    if (!itemImage?.imageKey) {
+      response.status(404).json({
+        error: 'Imagem nao encontrada para este item.'
+      });
+      return;
+    }
+
+    if (!canViewOrder(request.user, itemImage)) {
+      response.status(403).json({
+        error: 'Voce nao tem permissao para visualizar esta imagem.'
+      });
+      return;
+    }
+
+    const imagePath = resolveOrderImagePath(itemImage.imageKey);
+
+    if (!imagePath) {
+      response.status(404).json({
+        error: 'Imagem nao encontrada para este item.'
+      });
+      return;
+    }
+
+    try {
+      await fs.access(imagePath);
+    } catch (_error) {
+      response.status(404).json({
+        error: 'Imagem nao encontrada para este item.'
+      });
+      return;
+    }
+
+    response.setHeader('Content-Type', itemImage.imageMimeType || 'application/octet-stream');
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    response.sendFile(imagePath);
   } catch (error) {
     next(error);
   }
@@ -391,6 +533,7 @@ async function reopenOrderHandler(request, response, next) {
 export {
   createOrderHandler,
   deleteOrderHandler,
+  getOrderItemImageHandler,
   getOrderDetailsHandler,
   listOrdersHandler,
   reopenOrderHandler,

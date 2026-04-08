@@ -13,6 +13,8 @@ const orderStatuses = [
 ];
 const panelFilterStatuses = ['pendente', mergedPurchasedStatus];
 const historyFilterStatuses = [finalizedStatus, 'cancelado'];
+const maxOrderImageBytes = 5 * 1024 * 1024;
+const acceptedOrderImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const orderStatusLabels = {
   pending: 'pendente',
@@ -77,7 +79,9 @@ const createEmptyRequestItem = () => ({
   compraParaguai: false,
   quantity: 1,
   productValue: '',
-  saleValue: '0.00'
+  saleValue: '0.00',
+  imageFile: null,
+  imagePreviewUrl: ''
 });
 
 const createEmptyRequestForm = () => ({
@@ -129,6 +133,56 @@ function formatDateTime(value) {
   }
 
   return new Date(value).toLocaleString('pt-BR');
+}
+
+function validateRequestImageFile(file) {
+  if (!file) {
+    return '';
+  }
+
+  if (!acceptedOrderImageTypes.has(file.type)) {
+    return 'Tipo de imagem invalido. Use JPG, PNG ou WEBP.';
+  }
+
+  if (file.size > maxOrderImageBytes) {
+    return 'A imagem deve ter no maximo 5 MB.';
+  }
+
+  return '';
+}
+
+function revokeRequestItemPreview(item) {
+  if (item?.imagePreviewUrl) {
+    URL.revokeObjectURL(item.imagePreviewUrl);
+  }
+}
+
+function buildCreateOrderFormData(form) {
+  const formData = new FormData();
+
+  formData.append('requestName', form.requestName);
+  formData.append('buyerId', String(form.buyerId));
+  formData.append('urgency', form.urgency);
+  formData.append('relatedOs', form.relatedOs || '');
+
+  const serializedItems = form.items.map((item) => ({
+    productName: item.productName,
+    productLink: item.productLink,
+    notes: item.notes,
+    compraParaguai: Boolean(item.compraParaguai),
+    quantity: Number(item.quantity),
+    productValue: Number(item.productValue || 0)
+  }));
+
+  formData.append('items', JSON.stringify(serializedItems));
+
+  form.items.forEach((item, index) => {
+    if (item.imageFile) {
+      formData.append(`itemImage_${index}`, item.imageFile);
+    }
+  });
+
+  return formData;
 }
 
 function normalizeDateInputValue(value) {
@@ -269,6 +323,7 @@ function OrderDetailContent({
   selectedOrder,
   selectedOrderCanEdit,
   users,
+  openOrderItemImage,
   updateSelectedOrderCommentDraft,
   updateSelectedOrderField,
   updateSelectedOrderItem
@@ -425,6 +480,7 @@ function OrderDetailContent({
             <span>Produto</span>
             <span>Qtd</span>
             <span>Link</span>
+            <span>Imagem</span>
             <span>Detalhes</span>
             <span>Obs</span>
             <span>Compra PY</span>
@@ -455,6 +511,16 @@ function OrderDetailContent({
                     disabled={!item.productLink}
                   >
                     Abrir
+                  </button>
+                </div>
+                <div className="order-item-link-field">
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={() => openOrderItemImage(selectedOrder.id, item.id, item.productName)}
+                    disabled={!item.imageUrl}
+                  >
+                    Ver imagem
                   </button>
                 </div>
                 <span>{item.notes || '-'}</span>
@@ -617,6 +683,14 @@ function App() {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [formMessage, setFormMessage] = useState('');
   const [popup, setPopup] = useState(null);
+  const [orderImageModal, setOrderImageModal] = useState({
+    isOpen: false,
+    src: '',
+    title: '',
+    subtitle: '',
+    loading: false,
+    error: ''
+  });
   const [linkedOrderId, setLinkedOrderId] = useState(() => getOrderIdFromUrl());
 
   const activeOrders = orders.filter((order) => !isFinishedStatus(order.status));
@@ -640,6 +714,14 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [popup]);
 
+  useEffect(() => {
+    return () => {
+      if (orderImageModal.src?.startsWith('blob:')) {
+        URL.revokeObjectURL(orderImageModal.src);
+      }
+    };
+  }, [orderImageModal.src]);
+
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
     Boolean(requestForm.relatedOs.trim()) ||
@@ -650,8 +732,16 @@ function App() {
         item.notes.trim() ||
         item.compraParaguai ||
         String(item.quantity) !== '1' ||
-        String(item.productValue).trim()
+        String(item.productValue).trim() ||
+        Boolean(item.imageFile)
     );
+
+  function clearRequestFormState() {
+    setRequestForm((current) => {
+      current.items.forEach(revokeRequestItemPreview);
+      return createEmptyRequestForm();
+    });
+  }
 
   useEffect(() => {
     if (currentUser?.passwordChangeRequired) {
@@ -968,7 +1058,7 @@ function App() {
     );
 
     if (confirmed) {
-      setRequestForm(createEmptyRequestForm());
+      clearRequestFormState();
       setRequestMessage('');
     }
 
@@ -1055,17 +1145,49 @@ function App() {
     setRequestMessage('');
     setRequestForm((current) => {
       if (current.items.length === 1) {
+        current.items.forEach(revokeRequestItemPreview);
         return {
           ...current,
           items: [createEmptyRequestItem()]
         };
       }
 
+      const itemToRemove = current.items[index];
+      revokeRequestItemPreview(itemToRemove);
+
       return {
         ...current,
         items: current.items.filter((_, itemIndex) => itemIndex !== index)
       };
     });
+  }
+
+  function updateRequestItemImage(index, file) {
+    setRequestMessage('');
+    const imageError = validateRequestImageFile(file);
+
+    if (imageError) {
+      setRequestMessageType('error');
+      setRequestMessage(imageError);
+      return;
+    }
+
+    setRequestForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item;
+        }
+
+        revokeRequestItemPreview(item);
+
+        return {
+          ...item,
+          imageFile: file || null,
+          imagePreviewUrl: file ? URL.createObjectURL(file) : ''
+        };
+      })
+    }));
   }
 
   function changeTab(nextTab) {
@@ -1135,7 +1257,7 @@ function App() {
 
     clearSession();
     closeOrderActions();
-    setRequestForm(createEmptyRequestForm());
+    clearRequestFormState();
     setRequestMessage('');
     setPasswordForm(emptyPasswordForm);
     setPasswordMessage('');
@@ -1215,27 +1337,26 @@ function App() {
       return;
     }
 
+    const invalidItem = requestForm.items.find((item) =>
+      Boolean(validateRequestImageFile(item.imageFile))
+    );
+
+    if (invalidItem) {
+      setRequestMessageType('error');
+      setRequestMessage(validateRequestImageFile(invalidItem.imageFile));
+      setIsSubmittingRequest(false);
+      return;
+    }
+
     try {
+      const formData = buildCreateOrderFormData(requestForm);
+
       const response = await fetch(`${apiBaseUrl}/orders`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          requestName: requestForm.requestName,
-          buyerId: requestForm.buyerId,
-          urgency: requestForm.urgency,
-          relatedOs: requestForm.relatedOs,
-          items: requestForm.items.map((item) => ({
-            productName: item.productName,
-            productLink: item.productLink,
-            notes: item.notes,
-            compraParaguai: Boolean(item.compraParaguai),
-            quantity: Number(item.quantity),
-            productValue: Number(item.productValue || 0)
-          }))
-        })
+        body: formData
       });
       const data = await response.json();
 
@@ -1243,7 +1364,7 @@ function App() {
         throw new Error(data.error || 'Nao foi possivel enviar o pedido.');
       }
 
-      setRequestForm(createEmptyRequestForm());
+      clearRequestFormState();
       setRequestMessageType('success');
       setRequestMessage('Pedido enviado com sucesso.');
       setPopup({
@@ -1419,6 +1540,74 @@ function App() {
       setOrderActionMessage(error.message);
     } finally {
       setIsSavingSelectedOrder(false);
+    }
+  }
+
+  function closeOrderImageModal() {
+    setOrderImageModal((current) => {
+      if (current.src?.startsWith('blob:')) {
+        URL.revokeObjectURL(current.src);
+      }
+
+      return {
+        isOpen: false,
+        src: '',
+        title: '',
+        subtitle: '',
+        loading: false,
+        error: ''
+      };
+    });
+  }
+
+  async function openOrderItemImage(orderId, itemId, productName = '') {
+    setOrderImageModal((current) => {
+      if (current.src?.startsWith('blob:')) {
+        URL.revokeObjectURL(current.src);
+      }
+
+      return {
+        isOpen: true,
+        src: '',
+        title: productName || `Item #${itemId}`,
+        subtitle: `Pedido #${orderId}`,
+        loading: true,
+        error: ''
+      };
+    });
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders/${orderId}/items/${itemId}/image`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await parseApiResponse(response);
+        throw new Error(errorData?.error || 'Nao foi possivel carregar a imagem deste item.');
+      }
+
+      const imageBlob = await response.blob();
+      const imageObjectUrl = URL.createObjectURL(imageBlob);
+      setOrderImageModal((current) => ({
+        ...current,
+        src: imageObjectUrl,
+        loading: false,
+        error: ''
+      }));
+    } catch (error) {
+      const errorMessage = error.message || 'Nao foi possivel carregar a imagem deste item.';
+      setOrderImageModal((current) => ({
+        ...current,
+        src: '',
+        loading: false,
+        error: errorMessage
+      }));
+      setPopup({
+        type: 'warning',
+        message: errorMessage
+      });
     }
   }
 
@@ -1669,6 +1858,47 @@ function App() {
           </div>
         ) : null}
 
+        {orderImageModal.isOpen ? (
+          <div
+            className="photo-modal"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeOrderImageModal();
+              }
+            }}
+          >
+            <div className="photo-modal__box">
+              <div className="photo-modal__content">
+                {orderImageModal.loading ? (
+                  <p className="photo-modal__loading">Carregando imagem...</p>
+                ) : null}
+
+                {!orderImageModal.loading && orderImageModal.error ? (
+                  <p className="photo-modal__error">{orderImageModal.error}</p>
+                ) : null}
+
+                {!orderImageModal.loading && !orderImageModal.error && orderImageModal.src ? (
+                  <img src={orderImageModal.src} alt={orderImageModal.title || 'Imagem do item'} />
+                ) : null}
+              </div>
+
+              <div className="photo-modal__footer">
+                <div>
+                  <p className="photo-modal__title">{orderImageModal.title || 'Imagem do item'}</p>
+                  <p className="photo-modal__subtitle">{orderImageModal.subtitle}</p>
+                </div>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={closeOrderImageModal}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {activeTab === 'password' ? (
           <PasswordChangeContent
             currentUser={currentUser}
@@ -1851,6 +2081,37 @@ function App() {
                         <input type="text" value={item.saleValue} readOnly />
                       </label>
                     </div>
+
+                    <div className="item-image-upload">
+                      <label>
+                        <span>Imagem do item (opcional)</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) =>
+                            updateRequestItemImage(
+                              index,
+                              event.target.files && event.target.files[0]
+                                ? event.target.files[0]
+                                : null
+                            )
+                          }
+                        />
+                      </label>
+
+                      {item.imagePreviewUrl ? (
+                        <div className="item-image-preview">
+                          <img src={item.imagePreviewUrl} alt={`Preview do item ${index + 1}`} />
+                          <button
+                            type="button"
+                            className="button button--ghost"
+                            onClick={() => updateRequestItemImage(index, null)}
+                          >
+                            Remover imagem
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                     </article>
                   ))}
                 </div>
@@ -1930,6 +2191,7 @@ function App() {
                       selectedOrder={selectedOrder}
                       selectedOrderCanEdit={selectedOrderCanEdit}
                       users={users}
+                      openOrderItemImage={openOrderItemImage}
                       updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                       updateSelectedOrderField={updateSelectedOrderField}
                       updateSelectedOrderItem={updateSelectedOrderItem}
@@ -2136,6 +2398,7 @@ function App() {
                         selectedOrder={selectedOrder}
                         selectedOrderCanEdit={selectedOrderCanEdit}
                         users={users}
+                        openOrderItemImage={openOrderItemImage}
                         updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                         updateSelectedOrderField={updateSelectedOrderField}
                         updateSelectedOrderItem={updateSelectedOrderItem}

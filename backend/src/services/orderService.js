@@ -65,6 +65,7 @@ function normalizeOrder(row) {
 function normalizeOrderItem(row) {
   return {
     id: row.id,
+    orderId: row.order_id,
     productName: row.product_name,
     productLink: row.product_link ?? '',
     notes: row.notes ?? '',
@@ -72,7 +73,14 @@ function normalizeOrderItem(row) {
     quantity: Number(row.quantity),
     productValue: Number(row.product_value),
     saleValue: Number(row.sale_value),
-    passedValue: Number(row.passed_value)
+    passedValue: Number(row.passed_value),
+    imageKey: row.image_key ?? null,
+    imageMimeType: row.image_mime_type ?? null,
+    imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes),
+    imageUrl:
+      row.image_key && row.order_id
+        ? `/api/orders/${row.order_id}/items/${row.id}/image`
+        : null
   };
 }
 
@@ -249,6 +257,7 @@ async function getOrderById(orderId) {
     `
       SELECT
         id,
+        order_id,
         product_name,
         product_link,
         notes,
@@ -256,7 +265,10 @@ async function getOrderById(orderId) {
         quantity,
         product_value,
         sale_value,
-        passed_value
+        passed_value,
+        image_key,
+        image_mime_type,
+        image_size_bytes
       FROM order_items
       WHERE order_id = $1
       ORDER BY id ASC
@@ -383,9 +395,12 @@ async function createOrder({
             quantity,
             product_value,
             sale_value,
-            passed_value
+            passed_value,
+            image_key,
+            image_mime_type,
+            image_size_bytes
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `,
         [
           order.id,
@@ -396,7 +411,10 @@ async function createOrder({
           item.quantity,
           item.productValue,
           item.saleValue,
-          item.passedValue
+          item.passedValue,
+          item.imageKey,
+          item.imageMimeType,
+          item.imageSizeBytes
         ]
       );
     }
@@ -719,9 +737,47 @@ async function deleteOrder(orderId) {
   return Boolean(result.rowCount);
 }
 
+async function getOrderItemImage({ orderId, itemId }) {
+  const result = await pool.query(
+    `
+      SELECT
+        o.id AS order_id,
+        o.user_id,
+        o.buyer_id,
+        oi.id AS item_id,
+        oi.image_key,
+        oi.image_mime_type,
+        oi.image_size_bytes
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE oi.order_id = $1
+        AND oi.id = $2
+      LIMIT 1
+    `,
+    [orderId, itemId]
+  );
+
+  const row = result.rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    orderId: row.order_id,
+    userId: row.user_id,
+    buyerId: row.buyer_id,
+    itemId: row.item_id,
+    imageKey: row.image_key,
+    imageMimeType: row.image_mime_type,
+    imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes)
+  };
+}
+
 export {
   createOrder,
   deleteOrder,
+  getOrderItemImage,
   getOrderById,
   listOrders,
   reopenOrder,

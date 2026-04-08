@@ -119,6 +119,15 @@ ADD COLUMN IF NOT EXISTS passed_value NUMERIC(12, 2) NOT NULL DEFAULT 0;
 ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE;
 
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS image_key VARCHAR(255);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS image_mime_type VARCHAR(80);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
+
 UPDATE order_items
 SET passed_value = sale_value * quantity
 WHERE passed_value = 0;

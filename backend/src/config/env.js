@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -29,6 +30,10 @@ const env = {
   smtpFrom: process.env.SMTP_FROM ?? 'noreply@microgate.local',
   enableEmail: process.env.ENABLE_EMAIL !== 'false',
   authSecret,
+  orderImagesDir:
+    process.env.ORDER_IMAGES_DIR ?? path.resolve(process.cwd(), 'uploads', 'order-items'),
+  maxOrderImageFileSizeBytes: Number(process.env.MAX_ORDER_IMAGE_FILE_SIZE_BYTES ?? 5242880),
+  maxOrderImagesPerRequest: Number(process.env.MAX_ORDER_IMAGES_PER_REQUEST ?? 20),
   databaseUrl:
     process.env.DATABASE_URL ??
     'postgresql://postgres:postgres@localhost:5432/compras_db'
