@@ -35,6 +35,10 @@ pnpm-debug.log*
 *.pid.lock
 .pm2/
 
+# User uploads (keep local only)
+backend/uploads/
+uploads/
+
 # OS / Editor
 .DS_Store
 Thumbs.db
