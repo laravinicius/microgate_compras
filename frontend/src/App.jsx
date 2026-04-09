@@ -482,7 +482,6 @@ function OrderDetailContent({
             <span>Link</span>
             <span>Imagem</span>
             <span>Detalhes</span>
-            <span>Obs</span>
             <span>Compra PY</span>
             <span>Valor do produto</span>
             <span>Valor da venda</span>
