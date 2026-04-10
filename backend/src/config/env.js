@@ -13,6 +13,18 @@ const frontendUrls = (
   .map((value) => value.trim())
   .filter(Boolean);
 
+const trustProxyRaw = process.env.TRUST_PROXY;
+const trustProxy =
+  trustProxyRaw == null
+    ? false
+    : trustProxyRaw === 'true'
+      ? true
+      : trustProxyRaw === 'false'
+        ? false
+        : Number.isNaN(Number(trustProxyRaw))
+          ? false
+          : Number(trustProxyRaw);
+
 if (nodeEnv === 'production' && authSecret === defaultAuthSecret) {
   throw new Error('AUTH_SECRET deve ser definido em producao.');
 }
@@ -23,6 +35,7 @@ const env = {
   port: Number(process.env.PORT ?? 4000),
   frontendUrl: frontendUrls[0] ?? 'http://localhost:5173',
   frontendUrls,
+  trustProxy,
   smtpHost: process.env.SMTP_HOST ?? 'localhost',
   smtpPort: Number(process.env.SMTP_PORT ?? 1025),
   smtpUser: process.env.SMTP_USER ?? '',

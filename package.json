@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "reload": "bash reload.sh",
+    "reload": "bash reload.sh hml",
+    "reload:hml": "bash reload.sh hml",
+    "reload:prd": "bash reload.sh prd",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -7,6 +7,8 @@ import { apiRouter } from './routes/index.js';
 
 const app = express();
 
+app.set('trust proxy', env.trustProxy);
+
 app.use(helmet());
 app.use(
   cors({
