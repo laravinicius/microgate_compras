@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   id SERIAL PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
   product_name VARCHAR(180) NOT NULL,
+  product_code VARCHAR(120),
   product_link TEXT,
   notes TEXT,
   compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE,
@@ -127,6 +128,9 @@ ADD COLUMN IF NOT EXISTS image_mime_type VARCHAR(80);
 
 ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS product_code VARCHAR(120);
 
 UPDATE order_items
 SET passed_value = sale_value * quantity

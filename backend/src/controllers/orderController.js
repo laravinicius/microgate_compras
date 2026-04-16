@@ -7,11 +7,6 @@ import {
   reopenOrder,
   updateOrder
 } from '../services/orderService.js';
-import {
-  isAdministrator,
-  isBuyer,
-  isRequester
-} from '../middlewares/authMiddleware.js';
 import { resolveOrderImagePath } from '../utils/orderImageStorage.js';
 import fs from 'fs/promises';
 
@@ -112,23 +107,7 @@ function validateItems(items, allowPartial = false) {
 }
 
 function canViewOrder(user, order) {
-  if (!user || !order) {
-    return false;
-  }
-
-  if (isAdministrator(user)) {
-    return true;
-  }
-
-  if (isBuyer(user)) {
-    return Number(user.id) === Number(order.buyerId);
-  }
-
-  if (isRequester(user)) {
-    return Number(user.id) === Number(order.userId);
-  }
-
-  return false;
+  return Boolean(user && order);
 }
 
 function parseItemsInput(rawItems) {
@@ -243,6 +222,7 @@ async function createOrderHandler(request, response, next) {
 
       return {
         productName: String(item.productName ?? '').trim(),
+        productCode: String(item.productCode ?? '').trim(),
         productLink: String(item.productLink ?? '').trim(),
         notes: String(item.notes ?? '').trim(),
         compraParaguai,
@@ -427,6 +407,7 @@ async function updateOrderHandler(request, response, next) {
 
       return {
         id: Number(item.id),
+        productCode: String(item.productCode ?? '').trim(),
         productLink: String(item.productLink ?? '').trim(),
         compraParaguai,
         productValue,

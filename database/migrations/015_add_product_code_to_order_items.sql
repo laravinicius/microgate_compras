@@ -1,0 +1,2 @@
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS product_code VARCHAR(120);

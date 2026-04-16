@@ -67,6 +67,7 @@ function normalizeOrderItem(row) {
     id: row.id,
     orderId: row.order_id,
     productName: row.product_name,
+    productCode: row.product_code ?? '',
     productLink: row.product_link ?? '',
     notes: row.notes ?? '',
     compraParaguai: Boolean(row.compra_paraguai),
@@ -259,6 +260,7 @@ async function getOrderById(orderId) {
         id,
         order_id,
         product_name,
+        product_code,
         product_link,
         notes,
         compra_paraguai,
@@ -389,6 +391,7 @@ async function createOrder({
           INSERT INTO order_items (
             order_id,
             product_name,
+            product_code,
             product_link,
             notes,
             compra_paraguai,
@@ -400,11 +403,12 @@ async function createOrder({
             image_mime_type,
             image_size_bytes
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         `,
         [
           order.id,
           item.productName,
+          item.productCode,
           item.productLink,
           item.notes,
           Boolean(item.compraParaguai),
@@ -563,15 +567,17 @@ async function updateOrder(
         `
           UPDATE order_items
           SET
-            product_link = $2,
-            product_value = $3,
-            sale_value = $4,
-            passed_value = $5,
-            compra_paraguai = $6
+            product_code = $2,
+            product_link = $3,
+            product_value = $4,
+            sale_value = $5,
+            passed_value = $6,
+            compra_paraguai = $7
           WHERE id = $1
         `,
         [
           item.id,
+          item.productCode,
           item.productLink,
           item.productValue,
           item.saleValue,
@@ -644,6 +650,10 @@ async function updateOrder(
 
       if ((previousItem.productLink || '') !== (item.productLink || '')) {
         historyEntries.push(`Item "${previousItem.productName}": link alterado.`);
+      }
+
+      if ((previousItem.productCode || '') !== (item.productCode || '')) {
+        historyEntries.push(`Item "${previousItem.productName}": codigo do produto alterado.`);
       }
     }
 

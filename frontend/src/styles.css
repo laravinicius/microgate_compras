@@ -667,6 +667,10 @@ input[readonly] {
   gap: 14px;
 }
 
+.form-grid--item-main {
+  grid-template-columns: minmax(200px, 1.2fr) minmax(150px, 0.8fr) minmax(220px, 1fr);
+}
+
 .form-grid--request-line {
   grid-template-columns: minmax(300px, 1.5fr) 180px 180px 140px;
   align-items: end;
@@ -908,7 +912,7 @@ input[readonly] {
 .order-items-table__head,
 .order-item-row {
   display: grid;
-  grid-template-columns: 1.15fr 0.38fr 1.1fr 0.8fr 0.95fr 0.78fr 0.8fr 0.82fr 1fr;
+  grid-template-columns: 1.05fr 0.8fr 0.36fr 1fr 0.76fr 0.9fr 0.7fr 0.78fr 0.8fr 1fr;
   gap: 8px;
   align-items: center;
 }

@@ -74,6 +74,7 @@ const emptyPasswordForm = {
 
 const createEmptyRequestItem = () => ({
   productName: '',
+  productCode: '',
   productLink: '',
   notes: '',
   compraParaguai: false,
@@ -167,6 +168,7 @@ function buildCreateOrderFormData(form) {
 
   const serializedItems = form.items.map((item) => ({
     productName: item.productName,
+    productCode: item.productCode,
     productLink: item.productLink,
     notes: item.notes,
     compraParaguai: Boolean(item.compraParaguai),
@@ -478,6 +480,7 @@ function OrderDetailContent({
         <div className="order-items-table">
           <div className="order-items-table__head">
             <span>Produto</span>
+            <span>Cód. do Produto</span>
             <span>Qtd</span>
             <span>Link</span>
             <span>Imagem</span>
@@ -492,6 +495,15 @@ function OrderDetailContent({
             {selectedOrder.items.map((item) => (
               <article key={item.id} className="order-item-row">
                 <strong>{item.productName}</strong>
+                <input
+                  type="text"
+                  value={item.productCode || ''}
+                  onChange={(event) =>
+                    updateSelectedOrderItem(item.id, 'productCode', event.target.value)
+                  }
+                  placeholder="Nao informado"
+                  disabled={!selectedOrderCanEdit}
+                />
                 <span>{item.quantity}</span>
                 <div className="order-item-link-field">
                   <input
@@ -727,6 +739,7 @@ function App() {
     requestForm.items.some(
       (item) =>
         item.productName.trim() ||
+        item.productCode.trim() ||
         item.productLink.trim() ||
         item.notes.trim() ||
         item.compraParaguai ||
@@ -1499,6 +1512,7 @@ function App() {
           relatedOs: String(selectedOrder.relatedOs ?? ''),
           items: selectedOrder.items.map((item) => ({
             id: item.id,
+            productCode: item.productCode || '',
             productLink: item.productLink,
             compraParaguai: Boolean(item.compraParaguai),
             productValue: Number(item.productValue || 0),
@@ -1998,7 +2012,7 @@ function App() {
                         </button>
                       </div>
 
-                    <div className="form-grid">
+                    <div className="form-grid form-grid--item-main">
                       <label>
                         <span>Produto</span>
                         <input
@@ -2008,6 +2022,18 @@ function App() {
                             updateRequestItem(index, 'productName', event.target.value)
                           }
                           placeholder="Nome do produto"
+                        />
+                      </label>
+
+                      <label>
+                        <span>Cód. do Produto</span>
+                        <input
+                          type="text"
+                          value={item.productCode}
+                          onChange={(event) =>
+                            updateRequestItem(index, 'productCode', event.target.value)
+                          }
+                          placeholder="Opcional"
                         />
                       </label>
 
