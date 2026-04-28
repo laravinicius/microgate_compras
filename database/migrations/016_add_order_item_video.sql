@@ -1,0 +1,8 @@
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_key VARCHAR(255);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_mime_type VARCHAR(80);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_size_bytes INTEGER;

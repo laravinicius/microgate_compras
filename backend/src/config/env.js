@@ -46,7 +46,10 @@ const env = {
   orderImagesDir:
     process.env.ORDER_IMAGES_DIR ?? path.resolve(process.cwd(), 'uploads', 'order-items'),
   maxOrderImageFileSizeBytes: Number(process.env.MAX_ORDER_IMAGE_FILE_SIZE_BYTES ?? 5242880),
-  maxOrderImagesPerRequest: Number(process.env.MAX_ORDER_IMAGES_PER_REQUEST ?? 20),
+  maxOrderVideoFileSizeBytes: Number(process.env.MAX_ORDER_VIDEO_FILE_SIZE_BYTES ?? 26214400),
+  maxOrderMediaFilesPerRequest: Number(
+    process.env.MAX_ORDER_MEDIA_FILES_PER_REQUEST ?? process.env.MAX_ORDER_IMAGES_PER_REQUEST ?? 20
+  ),
   databaseUrl:
     process.env.DATABASE_URL ??
     'postgresql://postgres:postgres@localhost:5432/compras_db'

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import {
   createOrderHandler,
   deleteOrderHandler,
-  getOrderItemImageHandler,
+  getOrderItemMediaHandler,
   getOrderDetailsHandler,
   listOrdersHandler,
   reopenOrderHandler,
@@ -21,7 +21,14 @@ const orderRouter = Router();
 orderRouter.use(requireAuth, requirePasswordChangeComplete);
 orderRouter.get('/orders', listOrdersHandler);
 orderRouter.get('/orders/:id', getOrderDetailsHandler);
-orderRouter.get('/orders/:id/items/:itemId/image', getOrderItemImageHandler);
+orderRouter.get('/orders/:id/items/:itemId/image', (request, response, next) => {
+  request.params.kind = 'image';
+  return getOrderItemMediaHandler(request, response, next);
+});
+orderRouter.get('/orders/:id/items/:itemId/video', (request, response, next) => {
+  request.params.kind = 'video';
+  return getOrderItemMediaHandler(request, response, next);
+});
 orderRouter.post('/orders', createOrderUploadMiddleware, createOrderHandler);
 orderRouter.put('/orders/:id', updateOrderHandler);
 orderRouter.put('/orders/:id/reopen', reopenOrderHandler);

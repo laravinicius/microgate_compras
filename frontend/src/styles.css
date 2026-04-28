@@ -225,6 +225,13 @@ select option {
   border-radius: 10px;
 }
 
+.photo-modal__video {
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  border-radius: 10px;
+}
+
 .photo-modal__footer {
   padding: 12px 14px;
   border-top: 1px solid var(--border);
@@ -760,6 +767,13 @@ input[readonly] {
   width: 90px;
   height: 90px;
   object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.item-image-preview video {
+  width: 140px;
+  max-width: 140px;
   border-radius: 12px;
   border: 1px solid var(--border);
 }

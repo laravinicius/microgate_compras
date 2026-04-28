@@ -78,10 +78,15 @@ function normalizeOrderItem(row) {
     imageKey: row.image_key ?? null,
     imageMimeType: row.image_mime_type ?? null,
     imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes),
+    videoKey: row.video_key ?? null,
+    videoMimeType: row.video_mime_type ?? null,
+    videoSizeBytes: row.video_size_bytes === null ? null : Number(row.video_size_bytes),
     imageUrl:
       row.image_key && row.order_id
         ? `/api/orders/${row.order_id}/items/${row.id}/image`
-        : null
+        : null,
+    videoUrl:
+      row.video_key && row.order_id ? `/api/orders/${row.order_id}/items/${row.id}/video` : null
   };
 }
 
@@ -270,7 +275,10 @@ async function getOrderById(orderId) {
         passed_value,
         image_key,
         image_mime_type,
-        image_size_bytes
+        image_size_bytes,
+        video_key,
+        video_mime_type,
+        video_size_bytes
       FROM order_items
       WHERE order_id = $1
       ORDER BY id ASC
@@ -401,9 +409,12 @@ async function createOrder({
             passed_value,
             image_key,
             image_mime_type,
-            image_size_bytes
+            image_size_bytes,
+            video_key,
+            video_mime_type,
+            video_size_bytes
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `,
         [
           order.id,
@@ -418,7 +429,10 @@ async function createOrder({
           item.passedValue,
           item.imageKey,
           item.imageMimeType,
-          item.imageSizeBytes
+          item.imageSizeBytes,
+          item.videoKey,
+          item.videoMimeType,
+          item.videoSizeBytes
         ]
       );
     }
@@ -748,6 +762,10 @@ async function deleteOrder(orderId) {
 }
 
 async function getOrderItemImage({ orderId, itemId }) {
+  return getOrderItemMedia({ orderId, itemId });
+}
+
+async function getOrderItemMedia({ orderId, itemId }) {
   const result = await pool.query(
     `
       SELECT
@@ -757,7 +775,10 @@ async function getOrderItemImage({ orderId, itemId }) {
         oi.id AS item_id,
         oi.image_key,
         oi.image_mime_type,
-        oi.image_size_bytes
+        oi.image_size_bytes,
+        oi.video_key,
+        oi.video_mime_type,
+        oi.video_size_bytes
       FROM order_items oi
       INNER JOIN orders o ON o.id = oi.order_id
       WHERE oi.order_id = $1
@@ -780,7 +801,10 @@ async function getOrderItemImage({ orderId, itemId }) {
     itemId: row.item_id,
     imageKey: row.image_key,
     imageMimeType: row.image_mime_type,
-    imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes)
+    imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes),
+    videoKey: row.video_key,
+    videoMimeType: row.video_mime_type,
+    videoSizeBytes: row.video_size_bytes === null ? null : Number(row.video_size_bytes)
   };
 }
 
@@ -788,6 +812,7 @@ export {
   createOrder,
   deleteOrder,
   getOrderItemImage,
+  getOrderItemMedia,
   getOrderById,
   listOrders,
   reopenOrder,

@@ -14,7 +14,9 @@ const orderStatuses = [
 const panelFilterStatuses = ['pendente', mergedPurchasedStatus];
 const historyFilterStatuses = [finalizedStatus, 'cancelado'];
 const maxOrderImageBytes = 5 * 1024 * 1024;
+const maxOrderVideoBytes = 25 * 1024 * 1024;
 const acceptedOrderImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const acceptedOrderVideoTypes = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']);
 
 const orderStatusLabels = {
   pending: 'pendente',
@@ -82,7 +84,9 @@ const createEmptyRequestItem = () => ({
   productValue: '',
   saleValue: '0.00',
   imageFile: null,
-  imagePreviewUrl: ''
+  imagePreviewUrl: '',
+  videoFile: null,
+  videoPreviewUrl: ''
 });
 
 const createEmptyRequestForm = () => ({
@@ -136,17 +140,17 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('pt-BR');
 }
 
-function validateRequestImageFile(file) {
+function validateRequestMediaFile(file, acceptedTypes, maxBytes, label) {
   if (!file) {
     return '';
   }
 
-  if (!acceptedOrderImageTypes.has(file.type)) {
-    return 'Tipo de imagem invalido. Use JPG, PNG ou WEBP.';
+  if (!acceptedTypes.has(file.type)) {
+    return `Tipo de ${label} invalido. Use um formato suportado.`;
   }
 
-  if (file.size > maxOrderImageBytes) {
-    return 'A imagem deve ter no maximo 5 MB.';
+  if (file.size > maxBytes) {
+    return `O ${label} deve ter no maximo ${Math.round(maxBytes / (1024 * 1024))} MB.`;
   }
 
   return '';
@@ -155,6 +159,10 @@ function validateRequestImageFile(file) {
 function revokeRequestItemPreview(item) {
   if (item?.imagePreviewUrl) {
     URL.revokeObjectURL(item.imagePreviewUrl);
+  }
+
+  if (item?.videoPreviewUrl) {
+    URL.revokeObjectURL(item.videoPreviewUrl);
   }
 }
 
@@ -181,6 +189,10 @@ function buildCreateOrderFormData(form) {
   form.items.forEach((item, index) => {
     if (item.imageFile) {
       formData.append(`itemImage_${index}`, item.imageFile);
+    }
+
+    if (item.videoFile) {
+      formData.append(`itemVideo_${index}`, item.videoFile);
     }
   });
 
@@ -325,7 +337,7 @@ function OrderDetailContent({
   selectedOrder,
   selectedOrderCanEdit,
   users,
-  openOrderItemImage,
+  openOrderItemMedia,
   updateSelectedOrderCommentDraft,
   updateSelectedOrderField,
   updateSelectedOrderItem
@@ -528,10 +540,18 @@ function OrderDetailContent({
                   <button
                     type="button"
                     className="button button--ghost"
-                    onClick={() => openOrderItemImage(selectedOrder.id, item.id, item.productName)}
+                    onClick={() => openOrderItemMedia(selectedOrder.id, item.id, 'image', item.productName)}
                     disabled={!item.imageUrl}
                   >
                     Ver imagem
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={() => openOrderItemMedia(selectedOrder.id, item.id, 'video', item.productName)}
+                    disabled={!item.videoUrl}
+                  >
+                    Ver vídeo
                   </button>
                 </div>
                 <span>{item.notes || '-'}</span>
@@ -699,6 +719,7 @@ function App() {
     src: '',
     title: '',
     subtitle: '',
+    mediaType: 'image',
     loading: false,
     error: ''
   });
@@ -745,7 +766,8 @@ function App() {
         item.compraParaguai ||
         String(item.quantity) !== '1' ||
         String(item.productValue).trim() ||
-        Boolean(item.imageFile)
+        Boolean(item.imageFile) ||
+        Boolean(item.videoFile)
     );
 
   function clearRequestFormState() {
@@ -1174,13 +1196,16 @@ function App() {
     });
   }
 
-  function updateRequestItemImage(index, file) {
+  function updateRequestItemMedia(index, mediaKind, file) {
     setRequestMessage('');
-    const imageError = validateRequestImageFile(file);
+    const mediaError =
+      mediaKind === 'video'
+        ? validateRequestMediaFile(file, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
+        : validateRequestMediaFile(file, acceptedOrderImageTypes, maxOrderImageBytes, 'imagem');
 
-    if (imageError) {
+    if (mediaError) {
       setRequestMessageType('error');
-      setRequestMessage(imageError);
+      setRequestMessage(mediaError);
       return;
     }
 
@@ -1191,12 +1216,17 @@ function App() {
           return item;
         }
 
-        revokeRequestItemPreview(item);
+        const fileKey = mediaKind === 'video' ? 'videoFile' : 'imageFile';
+        const previewKey = mediaKind === 'video' ? 'videoPreviewUrl' : 'imagePreviewUrl';
+
+        if (item[previewKey]) {
+          URL.revokeObjectURL(item[previewKey]);
+        }
 
         return {
           ...item,
-          imageFile: file || null,
-          imagePreviewUrl: file ? URL.createObjectURL(file) : ''
+          [fileKey]: file || null,
+          [previewKey]: file ? URL.createObjectURL(file) : ''
         };
       })
     }));
@@ -1350,12 +1380,18 @@ function App() {
     }
 
     const invalidItem = requestForm.items.find((item) =>
-      Boolean(validateRequestImageFile(item.imageFile))
+      Boolean(
+        validateRequestMediaFile(item.imageFile, acceptedOrderImageTypes, maxOrderImageBytes, 'imagem') ||
+          validateRequestMediaFile(item.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
+      )
     );
 
     if (invalidItem) {
       setRequestMessageType('error');
-      setRequestMessage(validateRequestImageFile(invalidItem.imageFile));
+      setRequestMessage(
+        validateRequestMediaFile(invalidItem.imageFile, acceptedOrderImageTypes, maxOrderImageBytes, 'imagem') ||
+          validateRequestMediaFile(invalidItem.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
+      );
       setIsSubmittingRequest(false);
       return;
     }
@@ -1567,13 +1603,14 @@ function App() {
         src: '',
         title: '',
         subtitle: '',
+        mediaType: 'image',
         loading: false,
         error: ''
       };
     });
   }
 
-  async function openOrderItemImage(orderId, itemId, productName = '') {
+  async function openOrderItemMedia(orderId, itemId, mediaKind, productName = '') {
     setOrderImageModal((current) => {
       if (current.src?.startsWith('blob:')) {
         URL.revokeObjectURL(current.src);
@@ -1584,13 +1621,14 @@ function App() {
         src: '',
         title: productName || `Item #${itemId}`,
         subtitle: `Pedido #${orderId}`,
+        mediaType: mediaKind,
         loading: true,
         error: ''
       };
     });
 
     try {
-      const response = await fetch(`${apiBaseUrl}/orders/${orderId}/items/${itemId}/image`, {
+      const response = await fetch(`${apiBaseUrl}/orders/${orderId}/items/${itemId}/${mediaKind}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -1598,19 +1636,24 @@ function App() {
 
       if (!response.ok) {
         const errorData = await parseApiResponse(response);
-        throw new Error(errorData?.error || 'Nao foi possivel carregar a imagem deste item.');
+        throw new Error(
+          errorData?.error ||
+            `Nao foi possivel carregar a ${mediaKind === 'video' ? 'video' : 'imagem'} deste item.`
+        );
       }
 
-      const imageBlob = await response.blob();
-      const imageObjectUrl = URL.createObjectURL(imageBlob);
+      const mediaBlob = await response.blob();
+      const mediaObjectUrl = URL.createObjectURL(mediaBlob);
       setOrderImageModal((current) => ({
         ...current,
-        src: imageObjectUrl,
+        src: mediaObjectUrl,
         loading: false,
         error: ''
       }));
     } catch (error) {
-      const errorMessage = error.message || 'Nao foi possivel carregar a imagem deste item.';
+      const errorMessage =
+        error.message ||
+        `Nao foi possivel carregar a ${mediaKind === 'video' ? 'video' : 'imagem'} deste item.`;
       setOrderImageModal((current) => ({
         ...current,
         src: '',
@@ -1883,7 +1926,9 @@ function App() {
             <div className="photo-modal__box">
               <div className="photo-modal__content">
                 {orderImageModal.loading ? (
-                  <p className="photo-modal__loading">Carregando imagem...</p>
+                  <p className="photo-modal__loading">
+                    Carregando {orderImageModal.mediaType === 'video' ? 'vídeo' : 'imagem'}...
+                  </p>
                 ) : null}
 
                 {!orderImageModal.loading && orderImageModal.error ? (
@@ -1891,13 +1936,26 @@ function App() {
                 ) : null}
 
                 {!orderImageModal.loading && !orderImageModal.error && orderImageModal.src ? (
-                  <img src={orderImageModal.src} alt={orderImageModal.title || 'Imagem do item'} />
+                  orderImageModal.mediaType === 'video' ? (
+                    <video
+                      src={orderImageModal.src}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="photo-modal__video"
+                    />
+                  ) : (
+                    <img src={orderImageModal.src} alt={orderImageModal.title || 'Imagem do item'} />
+                  )
                 ) : null}
               </div>
 
               <div className="photo-modal__footer">
                 <div>
-                  <p className="photo-modal__title">{orderImageModal.title || 'Imagem do item'}</p>
+                  <p className="photo-modal__title">
+                    {orderImageModal.title ||
+                      (orderImageModal.mediaType === 'video' ? 'Vídeo do item' : 'Imagem do item')}
+                  </p>
                   <p className="photo-modal__subtitle">{orderImageModal.subtitle}</p>
                 </div>
                 <button
@@ -2114,8 +2172,9 @@ function App() {
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           onChange={(event) =>
-                            updateRequestItemImage(
+                            updateRequestItemMedia(
                               index,
+                              'image',
                               event.target.files && event.target.files[0]
                                 ? event.target.files[0]
                                 : null
@@ -2130,9 +2189,41 @@ function App() {
                           <button
                             type="button"
                             className="button button--ghost"
-                            onClick={() => updateRequestItemImage(index, null)}
+                            onClick={() => updateRequestItemMedia(index, 'image', null)}
                           >
                             Remover imagem
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="item-image-upload">
+                      <label>
+                        <span>Vídeo do item (opcional)</span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                          onChange={(event) =>
+                            updateRequestItemMedia(
+                              index,
+                              'video',
+                              event.target.files && event.target.files[0]
+                                ? event.target.files[0]
+                                : null
+                            )
+                          }
+                        />
+                      </label>
+
+                      {item.videoPreviewUrl ? (
+                        <div className="item-image-preview">
+                          <video src={item.videoPreviewUrl} controls className="photo-modal__video" />
+                          <button
+                            type="button"
+                            className="button button--ghost"
+                            onClick={() => updateRequestItemMedia(index, 'video', null)}
+                          >
+                            Remover vídeo
                           </button>
                         </div>
                       ) : null}
@@ -2216,7 +2307,7 @@ function App() {
                       selectedOrder={selectedOrder}
                       selectedOrderCanEdit={selectedOrderCanEdit}
                       users={users}
-                      openOrderItemImage={openOrderItemImage}
+                      openOrderItemMedia={openOrderItemMedia}
                       updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                       updateSelectedOrderField={updateSelectedOrderField}
                       updateSelectedOrderItem={updateSelectedOrderItem}
@@ -2423,7 +2514,7 @@ function App() {
                         selectedOrder={selectedOrder}
                         selectedOrderCanEdit={selectedOrderCanEdit}
                         users={users}
-                        openOrderItemImage={openOrderItemImage}
+                        openOrderItemMedia={openOrderItemMedia}
                         updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
                         updateSelectedOrderField={updateSelectedOrderField}
                         updateSelectedOrderItem={updateSelectedOrderItem}

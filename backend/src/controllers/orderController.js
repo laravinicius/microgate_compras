@@ -1,12 +1,13 @@
 import {
   createOrder,
   deleteOrder,
-  getOrderItemImage,
+  getOrderItemMedia,
   getOrderById,
   listOrders,
   reopenOrder,
   updateOrder
 } from '../services/orderService.js';
+import { env } from '../config/env.js';
 import { resolveOrderImagePath } from '../utils/orderImageStorage.js';
 import fs from 'fs/promises';
 
@@ -127,28 +128,52 @@ function parseItemsInput(rawItems) {
   return [];
 }
 
-function mapItemImageUploads(files, totalItems) {
-  const imageMap = new Map();
+function mapItemMediaUploads(files, totalItems) {
+  const mediaMap = new Map();
 
   for (const file of files) {
-    const match = /^itemImage_(\d+)$/.exec(String(file.fieldname || ''));
+    const match = /^(itemImage|itemVideo)_(\d+)$/.exec(String(file.fieldname || ''));
 
     if (!match) {
       continue;
     }
 
-    const itemIndex = Number(match[1]);
+    const itemIndex = Number(match[2]);
 
     if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= totalItems) {
-      const rangeError = new Error('Imagem enviada para item invalido.');
+      const rangeError = new Error('Mídia enviada para item invalido.');
       rangeError.statusCode = 400;
       throw rangeError;
     }
 
-    imageMap.set(itemIndex, file);
+    const currentMedia = mediaMap.get(itemIndex) || {};
+
+    if (match[1] === 'itemImage') {
+      currentMedia.image = file;
+    } else {
+      currentMedia.video = file;
+    }
+
+    mediaMap.set(itemIndex, currentMedia);
   }
 
-  return imageMap;
+  return mediaMap;
+}
+
+function validateUploadedMediaSizes(files) {
+  for (const file of files) {
+    const fieldName = String(file.fieldname || '');
+
+    if (fieldName.startsWith('itemImage_') && file.size > env.maxOrderImageFileSizeBytes) {
+      return 'A imagem deve ter no maximo 5 MB.';
+    }
+
+    if (fieldName.startsWith('itemVideo_') && file.size > env.maxOrderVideoFileSizeBytes) {
+      return 'O vídeo deve ter no maximo 25 MB.';
+    }
+  }
+
+  return '';
 }
 
 async function cleanupUploadedFiles(files) {
@@ -176,7 +201,16 @@ async function createOrderHandler(request, response, next) {
     const urgency = String(request.body?.urgency ?? 'normal').trim();
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
     const items = parseItemsInput(request.body?.items);
-    const imageUploads = mapItemImageUploads(uploadedFiles, items.length);
+    const mediaUploads = mapItemMediaUploads(uploadedFiles, items.length);
+    const mediaSizeError = validateUploadedMediaSizes(uploadedFiles);
+
+    if (mediaSizeError) {
+      await cleanupUploadedFiles(uploadedFiles);
+      response.status(400).json({
+        error: mediaSizeError
+      });
+      return;
+    }
 
     if (!requestName) {
       await cleanupUploadedFiles(uploadedFiles);
@@ -218,7 +252,7 @@ async function createOrderHandler(request, response, next) {
       const productValue = toCurrencyNumber(item.productValue);
       const compraParaguai = Boolean(item.compraParaguai);
       const saleValue = calculateSaleValue(productValue, compraParaguai);
-      const imageUpload = imageUploads.get(itemIndex);
+      const itemMedia = mediaUploads.get(itemIndex) || {};
 
       return {
         productName: String(item.productName ?? '').trim(),
@@ -230,9 +264,12 @@ async function createOrderHandler(request, response, next) {
         productValue,
         saleValue,
         passedValue: toCurrencyNumber(saleValue * Number(item.quantity)),
-        imageKey: imageUpload?.filename ?? null,
-        imageMimeType: imageUpload?.mimetype ?? null,
-        imageSizeBytes: Number(imageUpload?.size ?? 0) || null
+        imageKey: itemMedia.image?.filename ?? null,
+        imageMimeType: itemMedia.image?.mimetype ?? null,
+        imageSizeBytes: Number(itemMedia.image?.size ?? 0) || null,
+        videoKey: itemMedia.video?.filename ?? null,
+        videoMimeType: itemMedia.video?.mimetype ?? null,
+        videoSizeBytes: Number(itemMedia.video?.size ?? 0) || null
       };
     });
 
@@ -252,10 +289,11 @@ async function createOrderHandler(request, response, next) {
   }
 }
 
-async function getOrderItemImageHandler(request, response, next) {
+async function getOrderItemMediaHandler(request, response, next) {
   try {
     const orderId = Number(request.params.id);
     const itemId = Number(request.params.itemId);
+    const mediaKind = String(request.params.kind ?? '').trim();
 
     if (!Number.isInteger(orderId) || !Number.isInteger(itemId)) {
       response.status(400).json({
@@ -264,27 +302,36 @@ async function getOrderItemImageHandler(request, response, next) {
       return;
     }
 
-    const itemImage = await getOrderItemImage({ orderId, itemId });
+    if (!['image', 'video'].includes(mediaKind)) {
+      response.status(400).json({
+        error: 'Tipo de mídia invalido.'
+      });
+      return;
+    }
 
-    if (!itemImage?.imageKey) {
+    const itemMedia = await getOrderItemMedia({ orderId, itemId });
+    const mediaKey = mediaKind === 'video' ? itemMedia?.videoKey : itemMedia?.imageKey;
+    const mediaMimeType = mediaKind === 'video' ? itemMedia?.videoMimeType : itemMedia?.imageMimeType;
+
+    if (!mediaKey) {
       response.status(404).json({
-        error: 'Imagem nao encontrada para este item.'
+        error: mediaKind === 'video' ? 'Vídeo nao encontrado para este item.' : 'Imagem nao encontrada para este item.'
       });
       return;
     }
 
-    if (!canViewOrder(request.user, itemImage)) {
+    if (!canViewOrder(request.user, itemMedia)) {
       response.status(403).json({
-        error: 'Voce nao tem permissao para visualizar esta imagem.'
+        error: `Voce nao tem permissao para visualizar este ${mediaKind === 'video' ? 'vídeo' : 'arquivo'}.`
       });
       return;
     }
 
-    const imagePath = resolveOrderImagePath(itemImage.imageKey);
+    const imagePath = resolveOrderImagePath(mediaKey);
 
     if (!imagePath) {
       response.status(404).json({
-        error: 'Imagem nao encontrada para este item.'
+        error: mediaKind === 'video' ? 'Vídeo nao encontrado para este item.' : 'Imagem nao encontrada para este item.'
       });
       return;
     }
@@ -293,12 +340,12 @@ async function getOrderItemImageHandler(request, response, next) {
       await fs.access(imagePath);
     } catch (_error) {
       response.status(404).json({
-        error: 'Imagem nao encontrada para este item.'
+        error: mediaKind === 'video' ? 'Vídeo nao encontrado para este item.' : 'Imagem nao encontrada para este item.'
       });
       return;
     }
 
-    response.setHeader('Content-Type', itemImage.imageMimeType || 'application/octet-stream');
+    response.setHeader('Content-Type', mediaMimeType || 'application/octet-stream');
     response.setHeader('Cache-Control', 'private, max-age=300');
     response.sendFile(imagePath);
   } catch (error) {
@@ -514,7 +561,7 @@ async function reopenOrderHandler(request, response, next) {
 export {
   createOrderHandler,
   deleteOrderHandler,
-  getOrderItemImageHandler,
+  getOrderItemMediaHandler,
   getOrderDetailsHandler,
   listOrdersHandler,
   reopenOrderHandler,

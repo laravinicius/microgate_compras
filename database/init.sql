@@ -130,6 +130,15 @@ ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
 
 ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_key VARCHAR(255);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_mime_type VARCHAR(80);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS video_size_bytes INTEGER;
+
+ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS product_code VARCHAR(120);
 
 UPDATE order_items
