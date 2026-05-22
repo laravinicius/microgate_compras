@@ -3,6 +3,7 @@ import { sendBuyerNotification } from '../utils/email.js';
 
 const statusAliases = {
   pendente: ['pendente', 'pending'],
+  em_orcamento: ['em_orcamento', 'em orcamento', 'em orçamento', 'em-orcamento', 'em_orçamento'],
   'comprado/aguardando entrega': [
     'comprado/aguardando entrega',
     'comprado',
@@ -12,12 +13,21 @@ const statusAliases = {
   ],
   finalizado: ['finalizado', 'entregue', 'delivered'],
   cancelado: ['cancelado', 'cancelled'],
+  aguardando_aprovacao_do_cliente: [
+    'aguardando_aprovacao_do_cliente',
+    'aguardando aprovacao do cliente',
+    'aguardando aprovação do cliente',
+    'aguardando_aprovacao'
+  ],
   email_pending: ['email_pending', 'pendente email']
 };
 
 const statusCanonicalMap = {
   pending: 'pendente',
   pendente: 'pendente',
+  em_orcamento: 'em_orcamento',
+  'em orcamento': 'em_orcamento',
+  'em orçamento': 'em_orcamento',
   purchased: 'comprado/aguardando entrega',
   comprado: 'comprado/aguardando entrega',
   'aguardando entrega': 'comprado/aguardando entrega',
@@ -28,6 +38,9 @@ const statusCanonicalMap = {
   finalizado: 'finalizado',
   cancelled: 'cancelado',
   cancelado: 'cancelado',
+  aguardando_aprovacao_do_cliente: 'aguardando_aprovacao_do_cliente',
+  'aguardando aprovacao do cliente': 'aguardando_aprovacao_do_cliente',
+  'aguardando aprovação do cliente': 'aguardando_aprovacao_do_cliente',
   email_pending: 'email_pending',
   'pendente email': 'email_pending'
 };
@@ -352,6 +365,7 @@ async function createOrder({
 
     const total = items.reduce((sum, item) => sum + Number(item.passedValue), 0);
     const hasCompraParaguai = items.some((item) => Boolean(item.compraParaguai));
+    const initialStatus = Boolean(orcamento) ? 'em_orcamento' : 'pending';
 
     const orderResult = await client.query(
       `
@@ -367,7 +381,7 @@ async function createOrder({
           status,
           total
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING
           id,
           user_id,
@@ -394,6 +408,7 @@ async function createOrder({
         relatedOs === null || relatedOs === undefined,
         Boolean(orcamento),
         hasCompraParaguai,
+        initialStatus,
         total
       ]
     );

@@ -13,6 +13,8 @@ import fs from 'fs/promises';
 
 const allowedStatuses = [
   'pendente',
+  'em_orcamento',
+  'aguardando_aprovacao_do_cliente',
   'comprado/aguardando entrega',
   'comprado',
   'aguardando entrega',
@@ -21,6 +23,13 @@ const allowedStatuses = [
 ];
 
 function normalizeStatus(status) {
+  if (status === 'em_orcamento' || status === 'em orcamento' || status === 'em orçamento' || status === 'em-orcamento') {
+    return 'em_orcamento';
+  }
+
+  if (status === 'aguardando aprovacao do cliente' || status === 'aguardando aprovação do cliente' || status === 'aguardando_aprovacao_do_cliente' || status === 'aguardando_aprovacao') {
+    return 'aguardando_aprovacao_do_cliente';
+  }
   if (status === 'comprado' || status === 'aguardando entrega') {
     return 'comprado/aguardando entrega';
   }

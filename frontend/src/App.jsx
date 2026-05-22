@@ -7,6 +7,8 @@ const mergedPurchasedStatus = 'comprado/aguardando entrega';
 const finalizedStatus = 'finalizado';
 const orderStatuses = [
   'pendente',
+  'em_orcamento',
+  'aguardando_aprovacao_do_cliente',
   mergedPurchasedStatus,
   finalizedStatus,
   'cancelado'
@@ -32,7 +34,9 @@ const orderStatusLabels = {
   'pendente email': 'pendente email',
   entregue: 'Finalizado',
   finalizado: 'Finalizado',
-  cancelado: 'cancelado'
+  cancelado: 'cancelado',
+  em_orcamento: 'Em orçamento',
+  aguardando_aprovacao_do_cliente: 'Aguardando aprovação do cliente'
 };
 
 function normalizeOrderStatus(status) {
