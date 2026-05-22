@@ -8,9 +8,9 @@ const transporter = nodemailer.createTransport({
   auth:
     env.smtpUser && env.smtpPass
       ? {
-          user: env.smtpUser,
-          pass: env.smtpPass
-        }
+        user: env.smtpUser,
+        pass: env.smtpPass
+      }
       : undefined
 });
 
@@ -64,7 +64,7 @@ export async function sendBuyerNotification({
       timeZone: 'America/Sao_Paulo'
     });
 
-    const trackingUrl = `${env.frontendUrl}/?orderId=${orderId}`;
+    const trackingUrl = `${env.frontendUrl}/#orderId=${orderId}`;
 
     const htmlContent = `
       <!DOCTYPE html>

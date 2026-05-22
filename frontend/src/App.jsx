@@ -3,7 +3,7 @@ import microgateLogo from './assets/microgate2.png';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
-const mergedPurchasedStatus = 'comprado/aguardando entrega';
+const mergedPurchasedStatus = 'Comprado/aguardando entrega';
 const finalizedStatus = 'finalizado';
 const orderStatuses = [
   'pendente',
@@ -24,23 +24,28 @@ const orderStatusLabels = {
   pending: 'pendente',
   purchased: mergedPurchasedStatus,
   waiting_delivery: mergedPurchasedStatus,
+  'comprado/aguardando entrega': mergedPurchasedStatus,
   delivered: 'Finalizado',
   email_pending: 'pendente email',
   cancelled: 'cancelado',
-  pendente: 'pendente',
+  pendente: 'Pendente',
   comprado: mergedPurchasedStatus,
   'aguardando entrega': mergedPurchasedStatus,
-  'comprado/aguardando entrega': mergedPurchasedStatus,
+  'Comprado/aguardando entrega': mergedPurchasedStatus,
   'pendente email': 'pendente email',
   entregue: 'Finalizado',
   finalizado: 'Finalizado',
-  cancelado: 'cancelado',
+  cancelado: 'Cancelado',
   em_orcamento: 'Em orçamento',
   aguardando_aprovacao_do_cliente: 'Aguardando aprovação do cliente'
 };
 
 function normalizeOrderStatus(status) {
   if (status === 'comprado' || status === 'purchased') {
+    return mergedPurchasedStatus;
+  }
+
+  if (status === 'comprado/aguardando entrega') {
     return mergedPurchasedStatus;
   }
 
@@ -222,15 +227,53 @@ function openDatePickerOnFieldClick(event) {
 }
 
 function getOrderIdFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const rawValue = params.get('orderId');
-  const orderId = Number(rawValue);
+  const parseOrderId = (value) => {
+    const orderId = Number(value);
 
-  if (!Number.isInteger(orderId) || orderId <= 0) {
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      return null;
+    }
+
+    return orderId;
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const orderIdFromQuery = parseOrderId(params.get('orderId'));
+
+  if (orderIdFromQuery) {
+    return orderIdFromQuery;
+  }
+
+  const hash = String(window.location.hash || '').trim();
+
+  if (!hash) {
     return null;
   }
 
-  return orderId;
+  const orderIdFromHashParam = /^#orderId=(\d+)$/i.exec(hash);
+
+  if (orderIdFromHashParam) {
+    return parseOrderId(orderIdFromHashParam[1]);
+  }
+
+  const orderIdFromHashRoute = /^#\/orders?\/(\d+)$/i.exec(hash);
+
+  if (orderIdFromHashRoute) {
+    return parseOrderId(orderIdFromHashRoute[1]);
+  }
+
+  return null;
+}
+
+function clearOrderIdFromUrl() {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.delete('orderId');
+
+  if (/^#orderId=\d+$/i.test(nextUrl.hash) || /^#\/orders?\/\d+$/i.test(nextUrl.hash)) {
+    nextUrl.hash = '';
+  }
+
+  window.history.replaceState({}, '', nextUrl.toString());
 }
 
 async function parseApiResponse(response) {
@@ -846,10 +889,7 @@ function App() {
 
     openOrderActions(linkedOrderId);
     setLinkedOrderId(null);
-
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.delete('orderId');
-    window.history.replaceState({}, '', nextUrl.toString());
+    clearOrderIdFromUrl();
   }, [currentUser, linkedOrderId]);
 
   useEffect(() => {
@@ -2418,6 +2458,7 @@ function App() {
                   </div>
 
                   {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
+                  {selectedOrderError ? <p className="feedback feedback--error">{selectedOrderError}</p> : null}
                   {isLoadingOrders ? <p>Carregando pedidos...</p> : null}
                   {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
 
