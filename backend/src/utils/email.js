@@ -27,20 +27,10 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-export async function sendBuyerNotification({
-  buyerEmail,
-  buyerName,
-  orderId,
-  orderData
-}) {
-  if (!env.enableEmail || !buyerEmail) {
-    return false;
-  }
-
-  try {
-    const itemsHtml = orderData.items
-      .map(
-        (item) => `
+function renderItemsHtml(items) {
+  return items
+    .map(
+      (item) => `
           <tr>
             <td style="border: 1px solid #ddd; padding: 8px;">${escapeHtml(item.productName)}</td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${Number(item.quantity || 0)}</td>
@@ -48,25 +38,35 @@ export async function sendBuyerNotification({
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">R$ ${money(item.passedValue)}</td>
           </tr>
         `
-      )
-      .join('');
+    )
+    .join('');
+}
 
-    const createdAt = orderData.createdAt
-      ? new Date(orderData.createdAt)
-      : new Date();
+function buildOrderEmailHtml({
+  buyerName,
+  orderId,
+  orderData,
+  heading,
+  subtitle,
+  introLines,
+  actionLabel,
+  actionUrl
+}) {
+  const createdAt = orderData.createdAt ? new Date(orderData.createdAt) : new Date();
 
-    const createdAtLabel = createdAt.toLocaleString('pt-BR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/Sao_Paulo'
-    });
+  const createdAtLabel = createdAt.toLocaleString('pt-BR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo'
+  });
 
-    const trackingUrl = `${env.frontendUrl}/#orderId=${orderId}`;
+  const itemsHtml = renderItemsHtml(orderData.items);
+  const introHtml = introLines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
 
-    const htmlContent = `
+  return `
       <!DOCTYPE html>
       <html>
         <head>
@@ -92,16 +92,16 @@ export async function sendBuyerNotification({
           <div class="container">
             <div class="header">
               <h1>Ordem #${orderId}</h1>
-              <p>Solicitação de Compra Recebida</p>
+              <p>${escapeHtml(subtitle)}</p>
             </div>
             <div class="content">
               <div class="section">
                 <p>Olá <strong>${escapeHtml(buyerName || 'Comprador')}</strong>,</p>
-                <p>Ordem criada para você. Confira o resumo abaixo:</p>
+                ${introHtml}
               </div>
 
               <div class="section">
-                <h2>Resumo da Ordem</h2>
+                <h2>${escapeHtml(heading)}</h2>
                 <table>
                   <tr><td><strong>ID:</strong></td><td>#${orderId}</td></tr>
                   <tr><td><strong>Data:</strong></td><td>${escapeHtml(createdAtLabel)}</td></tr>
@@ -132,7 +132,7 @@ export async function sendBuyerNotification({
               </div>
 
               <div class="button-wrap">
-                <a href="${escapeHtml(trackingUrl)}" class="button">Acompanhar Ordem</a>
+                <a href="${escapeHtml(actionUrl)}" class="button">${escapeHtml(actionLabel)}</a>
               </div>
 
               <div class="section">
@@ -146,6 +146,30 @@ export async function sendBuyerNotification({
         </body>
       </html>
     `;
+}
+
+export async function sendBuyerNotification({
+  buyerEmail,
+  buyerName,
+  orderId,
+  orderData
+}) {
+  if (!env.enableEmail || !buyerEmail) {
+    return false;
+  }
+
+  try {
+    const trackingUrl = `${env.frontendUrl}/#orderId=${orderId}`;
+    const htmlContent = buildOrderEmailHtml({
+      buyerName,
+      orderId,
+      orderData,
+      heading: 'Resumo da Ordem',
+      subtitle: 'Solicitação de Compra Recebida',
+      introLines: ['Ordem criada para você. Confira o resumo abaixo:'],
+      actionLabel: 'Acompanhar Ordem',
+      actionUrl: trackingUrl
+    });
 
     const info = await transporter.sendMail({
       from: env.smtpFrom,
@@ -162,6 +186,54 @@ export async function sendBuyerNotification({
   } catch (error) {
     console.error(
       `[Email] Falha ao enviar para ${buyerEmail} (order #${orderId}):`,
+      error.message
+    );
+    return false;
+  }
+}
+
+export async function sendBudgetApprovalNotification({
+  buyerEmail,
+  buyerName,
+  orderId,
+  orderData
+}) {
+  if (!env.enableEmail || !buyerEmail) {
+    return false;
+  }
+
+  try {
+    const trackingUrl = `${env.frontendUrl}/#orderId=${orderId}`;
+
+    const htmlContent = buildOrderEmailHtml({
+      buyerName,
+      orderId,
+      orderData,
+      heading: 'Resumo do Orçamento Aprovado',
+      subtitle: 'Orçamento aprovado',
+      introLines: [
+        'Seu orçamento foi aprovado.',
+        'Agora siga com a compra dos itens abaixo.'
+      ],
+      actionLabel: 'Ver Pedido',
+      actionUrl: trackingUrl
+    });
+
+    const info = await transporter.sendMail({
+      from: env.smtpFrom,
+      to: buyerEmail,
+      subject: `Ordem #${orderId} - Orçamento Aprovado`,
+      html: htmlContent
+    });
+
+    console.log(
+      `[Email] Notificação de aprovação enviada para ${buyerEmail} (order #${orderId})`,
+      info.messageId
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      `[Email] Falha ao enviar aprovação para ${buyerEmail} (order #${orderId}):`,
       error.message
     );
     return false;

@@ -1,5 +1,5 @@
 import { pool } from '../config/db.js';
-import { sendBuyerNotification } from '../utils/email.js';
+import { sendBudgetApprovalNotification, sendBuyerNotification } from '../utils/email.js';
 
 const statusAliases = {
   pendente: ['pendente', 'pending'],
@@ -50,10 +50,20 @@ const statusCanonicalMap = {
   'pendente email': 'email_pending'
 };
 
+const budgetOnlyStatuses = new Set([
+  'em_orcamento',
+  'aguardando_aprovacao_do_cliente',
+  'orcamento_aprovado'
+]);
+
 function normalizeOrderStatus(status) {
   const normalizedStatus = String(status ?? '').trim().toLowerCase();
 
   return statusCanonicalMap[normalizedStatus] || normalizedStatus;
+}
+
+function isBudgetOnlyStatus(status) {
+  return budgetOnlyStatuses.has(normalizeOrderStatus(status));
 }
 
 function normalizeOrder(row) {
@@ -570,6 +580,14 @@ async function updateOrder(
     const hasCompraParaguai = items.some((item) => Boolean(item.compraParaguai));
     const withoutOs = relatedOs === null || relatedOs === undefined || relatedOs === '';
 
+    if (!currentOrder.orcamento && isBudgetOnlyStatus(status)) {
+      const statusError = new Error(
+        'Esse status só pode ser usado em pedidos marcados como orçamento.'
+      );
+      statusError.statusCode = 400;
+      throw statusError;
+    }
+
     const orderResult = await client.query(
       `
         UPDATE orders
@@ -712,7 +730,49 @@ async function updateOrder(
 
     await client.query('COMMIT');
 
-    return getOrderById(orderId);
+    const updatedOrder = await getOrderById(orderId);
+
+    if (
+      currentOrder.status !== status &&
+      status === 'orcamento_aprovado' &&
+      updatedOrder?.buyerId
+    ) {
+      void (async () => {
+        try {
+          const buyerResult = await pool.query(
+            `
+              SELECT name, email
+              FROM users
+              WHERE id = $1
+            `,
+            [updatedOrder.buyerId]
+          );
+
+          const buyer = buyerResult.rows[0];
+
+          if (!buyer?.email) {
+            return;
+          }
+
+          await sendBudgetApprovalNotification({
+            buyerEmail: buyer.email,
+            buyerName: buyer.name,
+            orderId: updatedOrder.id,
+            orderData: {
+              items: updatedOrder.items,
+              total: updatedOrder.total,
+              urgency: updatedOrder.urgency,
+              requesterName: updatedOrder.requesterName,
+              createdAt: updatedOrder.createdAt
+            }
+          });
+        } catch (emailError) {
+          console.error('[Email] Erro no fluxo de aprovacao de orcamento:', emailError);
+        }
+      })();
+    }
+
+    return updatedOrder;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

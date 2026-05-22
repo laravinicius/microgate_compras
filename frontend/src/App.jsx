@@ -14,6 +14,11 @@ const orderStatuses = [
   finalizedStatus,
   'cancelado'
 ];
+const budgetOnlyOrderStatuses = new Set([
+  'em_orcamento',
+  'aguardando_aprovacao_do_cliente',
+  'orcamento_aprovado'
+]);
 const panelFilterStatuses = ['pendente', mergedPurchasedStatus];
 const historyFilterStatuses = [finalizedStatus, 'cancelado'];
 const maxOrderImageBytes = 5 * 1024 * 1024;
@@ -293,6 +298,14 @@ function formatOrderStatus(status) {
   return orderStatusLabels[status] || status || '-';
 }
 
+function getOrderStatusOptions(order) {
+  if (order?.orcamento) {
+    return orderStatuses;
+  }
+
+  return orderStatuses.filter((status) => !budgetOnlyOrderStatuses.has(status));
+}
+
 function normalizeRole(role) {
   if (role === 'admin') {
     return 'administrador';
@@ -495,7 +508,7 @@ function OrderDetailContent({
               onChange={(event) => updateSelectedOrderField('status', event.target.value)}
               disabled={!selectedOrderCanEdit}
             >
-              {orderStatuses.map((status) => (
+              {getOrderStatusOptions(selectedOrder).map((status) => (
                 <option key={status} value={status}>
                   {formatOrderStatus(status)}
                 </option>
