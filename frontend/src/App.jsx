@@ -1027,10 +1027,12 @@ function App() {
       }
 
       const persistedStatus = normalizeOrderStatus(data.order.status);
+      const persistedOrcamento = Boolean(data.order.orcamento) || isBudgetOnlyStatus(persistedStatus);
 
       setSelectedOrder({
         ...data.order,
         status: persistedStatus,
+        orcamento: persistedOrcamento,
         persistedStatus,
         relatedOs: data.order.relatedOs ? String(data.order.relatedOs) : '',
         estimatedDelivery: normalizeDateInputValue(data.order.estimatedDelivery),
@@ -1630,10 +1632,12 @@ function App() {
       }
 
       const persistedStatus = normalizeOrderStatus(data.order.status);
+      const persistedOrcamento = Boolean(data.order.orcamento) || isBudgetOnlyStatus(persistedStatus);
 
       setSelectedOrder({
         ...data.order,
         status: persistedStatus,
+        orcamento: persistedOrcamento,
         persistedStatus,
         comments: commentToSave,
         relatedOs: String(data.order.relatedOs ?? ''),

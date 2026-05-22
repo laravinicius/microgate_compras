@@ -269,6 +269,7 @@ async function getOrderById(orderId) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.orcamento,
         o.compra_paraguai,
         o.status,
         o.estimated_delivery,
