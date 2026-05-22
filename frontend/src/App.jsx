@@ -94,6 +94,7 @@ const createEmptyRequestForm = () => ({
   buyerId: null,
   urgency: 'normal',
   relatedOs: '',
+  orcamento: false,
   items: [createEmptyRequestItem()]
 });
 
@@ -173,6 +174,7 @@ function buildCreateOrderFormData(form) {
   formData.append('buyerId', String(form.buyerId));
   formData.append('urgency', form.urgency);
   formData.append('relatedOs', form.relatedOs || '');
+  formData.append('orcamento', form.orcamento ? 'true' : 'false');
 
   const serializedItems = form.items.map((item) => ({
     productName: item.productName,
@@ -430,6 +432,11 @@ function OrderDetailContent({
               value={selectedOrder.urgency === 'priority' ? 'Prioridade' : 'Normal'}
               readOnly
             />
+          </label>
+
+          <label className="checkbox-field checkbox-field--order-flag">
+            <input type="checkbox" checked={Boolean(selectedOrder.orcamento)} readOnly disabled />
+            <span>Orçamento</span>
           </label>
 
           <label>
@@ -757,6 +764,7 @@ function App() {
   const hasUnsavedRequestChanges =
     Boolean(requestForm.requestName.trim()) ||
     Boolean(requestForm.relatedOs.trim()) ||
+    Boolean(requestForm.orcamento) ||
     requestForm.items.some(
       (item) =>
         item.productName.trim() ||
@@ -1382,7 +1390,7 @@ function App() {
     const invalidItem = requestForm.items.find((item) =>
       Boolean(
         validateRequestMediaFile(item.imageFile, acceptedOrderImageTypes, maxOrderImageBytes, 'imagem') ||
-          validateRequestMediaFile(item.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
+        validateRequestMediaFile(item.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
       )
     );
 
@@ -1390,7 +1398,7 @@ function App() {
       setRequestMessageType('error');
       setRequestMessage(
         validateRequestMediaFile(invalidItem.imageFile, acceptedOrderImageTypes, maxOrderImageBytes, 'imagem') ||
-          validateRequestMediaFile(invalidItem.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
+        validateRequestMediaFile(invalidItem.videoFile, acceptedOrderVideoTypes, maxOrderVideoBytes, 'vídeo')
       );
       setIsSubmittingRequest(false);
       return;
@@ -1638,7 +1646,7 @@ function App() {
         const errorData = await parseApiResponse(response);
         throw new Error(
           errorData?.error ||
-            `Nao foi possivel carregar a ${mediaKind === 'video' ? 'video' : 'imagem'} deste item.`
+          `Nao foi possivel carregar a ${mediaKind === 'video' ? 'video' : 'imagem'} deste item.`
         );
       }
 
@@ -1993,57 +2001,66 @@ function App() {
               </div>
 
               <form className="request-form" onSubmit={handleRequestSubmit}>
-              <div className="form-grid form-grid--request-line">
-                <label>
-                  <span>Nome do pedido</span>
-                  <input
-                    type="text"
-                    value={requestForm.requestName}
-                    onChange={(event) => updateRequestField('requestName', event.target.value)}
-                    placeholder="Ex.: Compra de insumos para bancada"
-                  />
-                </label>
+                <div className="form-grid form-grid--request-line">
+                  <label>
+                    <span>Nome do pedido</span>
+                    <input
+                      type="text"
+                      value={requestForm.requestName}
+                      onChange={(event) => updateRequestField('requestName', event.target.value)}
+                      placeholder="Ex.: Compra de insumos para bancada"
+                    />
+                  </label>
 
-                <label>
-                  <span>Comprador</span>
-                  <select
-                    value={requestForm.buyerId || ''}
-                    onChange={(event) => updateRequestField('buyerId', Number(event.target.value) || null)}
-                  >
-                    <option value="">Selecione</option>
-                    {users
-                      .filter((user) => normalizeRole(user.role) === 'comprador')
-                      .map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                  <label>
+                    <span>Comprador</span>
+                    <select
+                      value={requestForm.buyerId || ''}
+                      onChange={(event) => updateRequestField('buyerId', Number(event.target.value) || null)}
+                    >
+                      <option value="">Selecione</option>
+                      {users
+                        .filter((user) => normalizeRole(user.role) === 'comprador')
+                        .map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
 
-                <label>
-                  <span>urgência</span>
-                  <select
-                    value={requestForm.urgency}
-                    onChange={(event) => updateRequestField('urgency', event.target.value)}
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="priority">Prioridade</option>
-                  </select>
-                </label>
-                <label>
-                  <span>OS relacionada</span>
-                  <input
-                    type="text"
-                    value={requestForm.relatedOs}
-                    onChange={(event) => {
-                      const value = event.target.value.replace(/[^0-9]/g, '');
-                      updateRequestField('relatedOs', value);
-                    }}
-                    placeholder="Numero da OS"
-                  />
-                </label>
-              </div>
+                  <label>
+                    <span>urgência</span>
+                    <select
+                      value={requestForm.urgency}
+                      onChange={(event) => updateRequestField('urgency', event.target.value)}
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="priority">Prioridade</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>OS relacionada</span>
+                    <input
+                      type="text"
+                      value={requestForm.relatedOs}
+                      onChange={(event) => {
+                        const value = event.target.value.replace(/[^0-9]/g, '');
+                        updateRequestField('relatedOs', value);
+                      }}
+                      placeholder="Numero da OS"
+                    />
+                  </label>
+
+                  <label className="checkbox-field checkbox-field--request-budget">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(requestForm.orcamento)}
+                      onChange={(event) => updateRequestField('orcamento', event.target.checked)}
+                    />
+                    <span>Orçamento</span>
+                  </label>
+                </div>
 
                 <div className="items-header">
                   <div>
@@ -2070,173 +2087,172 @@ function App() {
                         </button>
                       </div>
 
-                    <div className="form-grid form-grid--item-main">
-                      <label>
-                        <span>Produto</span>
-                        <input
-                          type="text"
-                          value={item.productName}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'productName', event.target.value)
-                          }
-                          placeholder="Nome do produto"
-                        />
-                      </label>
+                      <div className="form-grid form-grid--item-main">
+                        <label>
+                          <span>Produto</span>
+                          <input
+                            type="text"
+                            value={item.productName}
+                            onChange={(event) =>
+                              updateRequestItem(index, 'productName', event.target.value)
+                            }
+                            placeholder="Nome do produto"
+                          />
+                        </label>
 
-                      <label>
-                        <span>Cód. do Produto</span>
-                        <input
-                          type="text"
-                          value={item.productCode}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'productCode', event.target.value)
-                          }
-                          placeholder="Opcional"
-                        />
-                      </label>
+                        <label>
+                          <span>Cód. do Produto</span>
+                          <input
+                            type="text"
+                            value={item.productCode}
+                            onChange={(event) =>
+                              updateRequestItem(index, 'productCode', event.target.value)
+                            }
+                            placeholder="Opcional"
+                          />
+                        </label>
 
-                      <label>
-                        <span>Link</span>
-                        <input
-                          type="url"
-                          value={item.productLink}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'productLink', event.target.value)
-                          }
-                          placeholder="https://"
-                        />
-                      </label>
-                    </div>
+                        <label>
+                          <span>Link</span>
+                          <input
+                            type="url"
+                            value={item.productLink}
+                            onChange={(event) =>
+                              updateRequestItem(index, 'productLink', event.target.value)
+                            }
+                            placeholder="https://"
+                          />
+                        </label>
+                      </div>
 
-                    <div className="form-grid form-grid--item-details">
-                      <label>
-                        <span>Obs</span>
-                        <input
-                          type="text"
-                          value={item.notes}
-                          onChange={(event) => updateRequestItem(index, 'notes', event.target.value)}
-                          placeholder="Detalhes do item"
-                        />
-                      </label>
+                      <div className="form-grid form-grid--item-details">
+                        <label>
+                          <span>Obs</span>
+                          <input
+                            type="text"
+                            value={item.notes}
+                            onChange={(event) => updateRequestItem(index, 'notes', event.target.value)}
+                            placeholder="Detalhes do item"
+                          />
+                        </label>
 
-                      <label className="checkbox-field checkbox-field--inline-row">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.compraParaguai)}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'compraParaguai', event.target.checked)
-                          }
-                        />
-                        <span>Compra Paraguai</span>
-                      </label>
+                        <label className="checkbox-field checkbox-field--inline-row">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(item.compraParaguai)}
+                            onChange={(event) =>
+                              updateRequestItem(index, 'compraParaguai', event.target.checked)
+                            }
+                          />
+                          <span>Compra Paraguai</span>
+                        </label>
 
-                      <label>
-                        <span>Qtd</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          min="1"
-                          max="9999"
-                          value={item.quantity}
-                          onChange={(event) => {
-                            const value = event.target.value.replace(/[^0-9]/g, '');
-                            updateRequestItem(index, 'quantity', value);
-                          }}
-                        />
-                      </label>
+                        <label>
+                          <span>Qtd</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            min="1"
+                            max="9999"
+                            value={item.quantity}
+                            onChange={(event) => {
+                              const value = event.target.value.replace(/[^0-9]/g, '');
+                              updateRequestItem(index, 'quantity', value);
+                            }}
+                          />
+                        </label>
 
-                      <label>
-                        <span>Valor do produto</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.productValue}
-                          onChange={(event) =>
-                            updateRequestItem(index, 'productValue', event.target.value)
-                          }
-                          placeholder="0.00"
-                        />
-                      </label>
+                        <label>
+                          <span>Valor do produto</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.productValue}
+                            onChange={(event) =>
+                              updateRequestItem(index, 'productValue', event.target.value)
+                            }
+                            placeholder="0.00"
+                          />
+                        </label>
 
-                      <label>
-                        <span>Valor de venda</span>
-                        <input type="text" value={item.saleValue} readOnly />
-                      </label>
-                    </div>
+                        <label>
+                          <span>Valor de venda</span>
+                          <input type="text" value={item.saleValue} readOnly />
+                        </label>
+                      </div>
 
-                    <div className="item-image-upload">
-                      <label>
-                        <span>Imagem do item (opcional)</span>
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={(event) =>
-                            updateRequestItemMedia(
-                              index,
-                              'image',
-                              event.target.files && event.target.files[0]
-                                ? event.target.files[0]
-                                : null
-                            )
-                          }
-                        />
-                      </label>
+                      <div className="item-image-upload">
+                        <label>
+                          <span>Imagem do item (opcional)</span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={(event) =>
+                              updateRequestItemMedia(
+                                index,
+                                'image',
+                                event.target.files && event.target.files[0]
+                                  ? event.target.files[0]
+                                  : null
+                              )
+                            }
+                          />
+                        </label>
 
-                      {item.imagePreviewUrl ? (
-                        <div className="item-image-preview">
-                          <img src={item.imagePreviewUrl} alt={`Preview do item ${index + 1}`} />
-                          <button
-                            type="button"
-                            className="button button--ghost"
-                            onClick={() => updateRequestItemMedia(index, 'image', null)}
-                          >
-                            Remover imagem
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                        {item.imagePreviewUrl ? (
+                          <div className="item-image-preview">
+                            <img src={item.imagePreviewUrl} alt={`Preview do item ${index + 1}`} />
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => updateRequestItemMedia(index, 'image', null)}
+                            >
+                              Remover imagem
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
 
-                    <div className="item-image-upload">
-                      <label>
-                        <span>Vídeo do item (opcional)</span>
-                        <input
-                          type="file"
-                          accept="video/mp4,video/webm,video/ogg,video/quicktime"
-                          onChange={(event) =>
-                            updateRequestItemMedia(
-                              index,
-                              'video',
-                              event.target.files && event.target.files[0]
-                                ? event.target.files[0]
-                                : null
-                            )
-                          }
-                        />
-                      </label>
+                      <div className="item-image-upload">
+                        <label>
+                          <span>Vídeo do item (opcional)</span>
+                          <input
+                            type="file"
+                            accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                            onChange={(event) =>
+                              updateRequestItemMedia(
+                                index,
+                                'video',
+                                event.target.files && event.target.files[0]
+                                  ? event.target.files[0]
+                                  : null
+                              )
+                            }
+                          />
+                        </label>
 
-                      {item.videoPreviewUrl ? (
-                        <div className="item-image-preview">
-                          <video src={item.videoPreviewUrl} controls className="photo-modal__video" />
-                          <button
-                            type="button"
-                            className="button button--ghost"
-                            onClick={() => updateRequestItemMedia(index, 'video', null)}
-                          >
-                            Remover vídeo
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                        {item.videoPreviewUrl ? (
+                          <div className="item-image-preview">
+                            <video src={item.videoPreviewUrl} controls className="photo-modal__video" />
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => updateRequestItemMedia(index, 'video', null)}
+                            >
+                              Remover vídeo
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     </article>
                   ))}
                 </div>
 
                 {requestMessage ? (
                   <p
-                    className={`feedback ${
-                      requestMessageType === 'error' ? 'feedback--error' : ''
-                    }`}
+                    className={`feedback ${requestMessageType === 'error' ? 'feedback--error' : ''
+                      }`}
                   >
                     {requestMessage}
                   </p>
@@ -2267,27 +2283,24 @@ function App() {
                     <aside className="order-actions-sidebar order-actions-sidebar--header">
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('order')}
                       >
                         Pedido
                       </button>
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('comments')}
                       >
                         Comentarios
                       </button>
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('history')}
                       >
                         Histórico
@@ -2295,56 +2308,56 @@ function App() {
                     </aside>
                   </div>
 
-                {selectedOrderError ? (
-                  <p className="feedback feedback--error">{selectedOrderError}</p>
-                ) : null}
-
-                <div className="order-actions-layout">
-                  <div className="order-actions-content">
-                    <OrderDetailContent
-                      currentSection={selectedOrderSection}
-                      commentDraft={selectedOrderCommentDraft}
-                      selectedOrder={selectedOrder}
-                      selectedOrderCanEdit={selectedOrderCanEdit}
-                      users={users}
-                      openOrderItemMedia={openOrderItemMedia}
-                      updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
-                      updateSelectedOrderField={updateSelectedOrderField}
-                      updateSelectedOrderItem={updateSelectedOrderItem}
-                    />
-                  </div>
-                </div>
-
-                {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
-
-                <div className="order-actions__top-buttons">
-                  {selectedOrderCanEdit ? (
-                    <button
-                      type="submit"
-                      className="button button--green"
-                      disabled={isSavingSelectedOrder}
-                    >
-                      {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
-                    </button>
+                  {selectedOrderError ? (
+                    <p className="feedback feedback--error">{selectedOrderError}</p>
                   ) : null}
-                  <button
-                    type="button"
-                    className="button button--ghost"
-                    onClick={closeOrderActions}
-                  >
-                    Voltar
-                  </button>
-                  {selectedOrderCanDelete ? (
+
+                  <div className="order-actions-layout">
+                    <div className="order-actions-content">
+                      <OrderDetailContent
+                        currentSection={selectedOrderSection}
+                        commentDraft={selectedOrderCommentDraft}
+                        selectedOrder={selectedOrder}
+                        selectedOrderCanEdit={selectedOrderCanEdit}
+                        users={users}
+                        openOrderItemMedia={openOrderItemMedia}
+                        updateSelectedOrderCommentDraft={updateSelectedOrderCommentDraft}
+                        updateSelectedOrderField={updateSelectedOrderField}
+                        updateSelectedOrderItem={updateSelectedOrderItem}
+                      />
+                    </div>
+                  </div>
+
+                  {orderActionMessage ? <p className="feedback">{orderActionMessage}</p> : null}
+
+                  <div className="order-actions__top-buttons">
+                    {selectedOrderCanEdit ? (
+                      <button
+                        type="submit"
+                        className="button button--green"
+                        disabled={isSavingSelectedOrder}
+                      >
+                        {isSavingSelectedOrder ? 'Salvando...' : 'Salvar alteracoes'}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      className="button button--danger"
-                      onClick={handleDeleteSelectedOrder}
-                      disabled={isDeletingSelectedOrder}
+                      className="button button--ghost"
+                      onClick={closeOrderActions}
                     >
-                      {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                      Voltar
                     </button>
-                  ) : null}
-                </div>
+                    {selectedOrderCanDelete ? (
+                      <button
+                        type="button"
+                        className="button button--danger"
+                        onClick={handleDeleteSelectedOrder}
+                        disabled={isDeletingSelectedOrder}
+                      >
+                        {isDeletingSelectedOrder ? 'Excluindo...' : 'Excluir'}
+                      </button>
+                    ) : null}
+                  </div>
                 </form>
               ) : (
                 <>
@@ -2358,99 +2371,99 @@ function App() {
                     </div>
                   </div>
 
-                <div className="panel-toolbar">
-                  <label className="search-field">
-                    <span>Filtrar por ID</span>
-                    <input
-                      type="text"
-                      value={ordersFilters.id}
-                      onChange={(event) => updateOrdersFilter('id', event.target.value)}
-                      placeholder="Ex.: 12"
-                    />
-                  </label>
+                  <div className="panel-toolbar">
+                    <label className="search-field">
+                      <span>Filtrar por ID</span>
+                      <input
+                        type="text"
+                        value={ordersFilters.id}
+                        onChange={(event) => updateOrdersFilter('id', event.target.value)}
+                        placeholder="Ex.: 12"
+                      />
+                    </label>
 
-                  <label className="search-field">
-                    <span>Filtrar por status</span>
-                    <select
-                      value={ordersFilters.status}
-                      onChange={(event) => updateOrdersFilter('status', event.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {availableStatusFilters.map((status) => (
-                        <option key={status} value={status}>
-                          {formatOrderStatus(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <label className="search-field">
+                      <span>Filtrar por status</span>
+                      <select
+                        value={ordersFilters.status}
+                        onChange={(event) => updateOrdersFilter('status', event.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        {availableStatusFilters.map((status) => (
+                          <option key={status} value={status}>
+                            {formatOrderStatus(status)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-                  <label className="search-field">
-                    <span>Filtrar por solicitante</span>
-                    <select
-                      value={ordersFilters.requesterId}
-                      onChange={(event) => updateOrdersFilter('requesterId', event.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} (@{user.username})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
-                {isLoadingOrders ? <p>Carregando pedidos...</p> : null}
-                {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
-
-                {!isLoadingOrders && !ordersError ? (
-                  <div className="orders-table">
-                    <div className="orders-table__head">
-                      <span>ID</span>
-                      <span>Última atualização</span>
-                      <span>Solicitante</span>
-                      <span>Comprador</span>
-                      <span>Descrição</span>
-                      <span>Itens</span>
-                      <span>urgência</span>
-                      <span>Status</span>
-                    </div>
-
-                    <div className="orders-table__body">
-                      {activeOrders.length === 0 ? (
-                        <p className="empty-state">Nenhum pedido ativo encontrado.</p>
-                      ) : (
-                        activeOrders.map((order) => (
-                          <article
-                            key={order.id}
-                            className="order-row order-row--clickable"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => openOrderActions(order.id)}
-                            onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
-                            aria-label={`Abrir pedido ${order.id}`}
-                          >
-                            <strong>#{order.id}</strong>
-                            <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
-                            <span>{order.requesterName || order.requesterUsername || '-'}</span>
-                            <span>{order.buyerName || order.buyerUsername || '-'}</span>
-                            <span>{order.requestName || '-'}</span>
-                            <span>{order.itemsCount}</span>
-                            <span
-                              className={
-                                order.urgency === 'priority' ? 'urgency-label urgency-label--priority' : 'urgency-label'
-                              }
-                            >
-                              {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
-                            </span>
-                            <span className="status-chip">{formatOrderStatus(order.status)}</span>
-                          </article>
-                        ))
-                      )}
-                    </div>
+                    <label className="search-field">
+                      <span>Filtrar por solicitante</span>
+                      <select
+                        value={ordersFilters.requesterId}
+                        onChange={(event) => updateOrdersFilter('requesterId', event.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} (@{user.username})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
-                ) : null}
+
+                  {isLoadingSelectedOrder ? <p>Carregando pedido...</p> : null}
+                  {isLoadingOrders ? <p>Carregando pedidos...</p> : null}
+                  {ordersError ? <p className="feedback feedback--error">{ordersError}</p> : null}
+
+                  {!isLoadingOrders && !ordersError ? (
+                    <div className="orders-table">
+                      <div className="orders-table__head">
+                        <span>ID</span>
+                        <span>Última atualização</span>
+                        <span>Solicitante</span>
+                        <span>Comprador</span>
+                        <span>Descrição</span>
+                        <span>Itens</span>
+                        <span>urgência</span>
+                        <span>Status</span>
+                      </div>
+
+                      <div className="orders-table__body">
+                        {activeOrders.length === 0 ? (
+                          <p className="empty-state">Nenhum pedido ativo encontrado.</p>
+                        ) : (
+                          activeOrders.map((order) => (
+                            <article
+                              key={order.id}
+                              className="order-row order-row--clickable"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openOrderActions(order.id)}
+                              onKeyDown={(event) => handleOrderRowKeyDown(event, order.id)}
+                              aria-label={`Abrir pedido ${order.id}`}
+                            >
+                              <strong>#{order.id}</strong>
+                              <span>{formatDateTime(order.updatedAt || order.createdAt)}</span>
+                              <span>{order.requesterName || order.requesterUsername || '-'}</span>
+                              <span>{order.buyerName || order.buyerUsername || '-'}</span>
+                              <span>{order.requestName || '-'}</span>
+                              <span>{order.itemsCount}</span>
+                              <span
+                                className={
+                                  order.urgency === 'priority' ? 'urgency-label urgency-label--priority' : 'urgency-label'
+                                }
+                              >
+                                {order.urgency === 'priority' ? 'Prioridade' : 'Normal'}
+                              </span>
+                              <span className="status-chip">{formatOrderStatus(order.status)}</span>
+                            </article>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </>
               )}
             </article>
@@ -2474,27 +2487,24 @@ function App() {
                     <aside className="order-actions-sidebar order-actions-sidebar--header">
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'order' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('order')}
                       >
                         Pedido
                       </button>
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'comments' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('comments')}
                       >
                         Comentarios
                       </button>
                       <button
                         type="button"
-                        className={`order-actions-nav-button ${
-                          selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
-                        }`}
+                        className={`order-actions-nav-button ${selectedOrderSection === 'history' ? 'order-actions-nav-button--active' : ''
+                          }`}
                         onClick={() => setSelectedOrderSection('history')}
                       >
                         Histórico
@@ -2697,67 +2707,67 @@ function App() {
               </div>
 
               <form className="user-form" onSubmit={handleUserSubmit}>
-              <label>
-                <span>Nome</span>
-                <input
-                  type="text"
-                  value={userForm.name}
-                  onChange={(event) => updateUserField('name', event.target.value)}
-                  placeholder="Nome completo"
-                />
-              </label>
+                <label>
+                  <span>Nome</span>
+                  <input
+                    type="text"
+                    value={userForm.name}
+                    onChange={(event) => updateUserField('name', event.target.value)}
+                    placeholder="Nome completo"
+                  />
+                </label>
 
-              <label>
-                <span>Usuario</span>
-                <input
-                  type="text"
-                  value={userForm.username}
-                  onChange={(event) => updateUserField('username', event.target.value)}
-                  placeholder="nome.de.acesso"
-                />
-              </label>
+                <label>
+                  <span>Usuario</span>
+                  <input
+                    type="text"
+                    value={userForm.username}
+                    onChange={(event) => updateUserField('username', event.target.value)}
+                    placeholder="nome.de.acesso"
+                  />
+                </label>
 
-              <label>
-                <span>Senha {userForm.id ? '(preencha apenas para trocar)' : ''}</span>
-                <input
-                  type="password"
-                  value={userForm.password}
-                  onChange={(event) => updateUserField('password', event.target.value)}
-                  placeholder={userForm.id ? 'Nova senha opcional' : 'Senha inicial'}
-                />
-              </label>
+                <label>
+                  <span>Senha {userForm.id ? '(preencha apenas para trocar)' : ''}</span>
+                  <input
+                    type="password"
+                    value={userForm.password}
+                    onChange={(event) => updateUserField('password', event.target.value)}
+                    placeholder={userForm.id ? 'Nova senha opcional' : 'Senha inicial'}
+                  />
+                </label>
 
-              <label>
-                <span>E-mail</span>
-                <input
-                  type="email"
-                  value={userForm.email}
-                  onChange={(event) => updateUserField('email', event.target.value)}
-                  placeholder="usuario@example.com"
-                />
-              </label>
+                <label>
+                  <span>E-mail</span>
+                  <input
+                    type="email"
+                    value={userForm.email}
+                    onChange={(event) => updateUserField('email', event.target.value)}
+                    placeholder="usuario@example.com"
+                  />
+                </label>
 
-              <label>
-                <span>Perfil</span>
-                <select
-                  value={userForm.role}
-                  onChange={(event) => updateUserField('role', event.target.value)}
-                >
-                  <option value="administrador">Administrador</option>
-                  <option value="comprador">Comprador</option>
-                  <option value="solicitante">Solicitante</option>
-                </select>
-              </label>
+                <label>
+                  <span>Perfil</span>
+                  <select
+                    value={userForm.role}
+                    onChange={(event) => updateUserField('role', event.target.value)}
+                  >
+                    <option value="administrador">Administrador</option>
+                    <option value="comprador">Comprador</option>
+                    <option value="solicitante">Solicitante</option>
+                  </select>
+                </label>
 
-              {formMessage ? <p className="feedback">{formMessage}</p> : null}
+                {formMessage ? <p className="feedback">{formMessage}</p> : null}
 
-              <button type="submit" className="button" disabled={isSavingUser}>
-                {isSavingUser
-                  ? 'Salvando...'
-                  : userForm.id
-                    ? 'Atualizar usuario'
-                    : 'Criar usuário'}
-              </button>
+                <button type="submit" className="button" disabled={isSavingUser}>
+                  {isSavingUser
+                    ? 'Salvando...'
+                    : userForm.id
+                      ? 'Atualizar usuario'
+                      : 'Criar usuário'}
+                </button>
               </form>
             </article>
 
@@ -2769,40 +2779,40 @@ function App() {
                 </div>
               </div>
 
-            {isLoadingUsers ? <p>Carregando Usuários...</p> : null}
-            {usersError ? <p className="feedback feedback--error">{usersError}</p> : null}
+              {isLoadingUsers ? <p>Carregando Usuários...</p> : null}
+              {usersError ? <p className="feedback feedback--error">{usersError}</p> : null}
 
-            {!isLoadingUsers && !usersError ? (
-              <div className="users-list">
-                {users.map((user) => (
-                  <article key={user.id} className="user-card">
-                    <div>
-                      <h3>{user.name}</h3>
-                      <p>@{user.username}</p>
-                      <span className="pill">{formatRoleLabel(user.role)}</span>
-                    </div>
+              {!isLoadingUsers && !usersError ? (
+                <div className="users-list">
+                  {users.map((user) => (
+                    <article key={user.id} className="user-card">
+                      <div>
+                        <h3>{user.name}</h3>
+                        <p>@{user.username}</p>
+                        <span className="pill">{formatRoleLabel(user.role)}</span>
+                      </div>
 
-                    <div className="user-card__actions">
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        onClick={() => handleEditUser(user)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--danger"
-                        onClick={() => handleDeleteUser(user.id)}
-                        disabled={currentUser.id === user.id}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
+                      <div className="user-card__actions">
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          onClick={() => handleEditUser(user)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--danger"
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={currentUser.id === user.id}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </article>
           </section>
         ) : null}

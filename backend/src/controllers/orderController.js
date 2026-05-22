@@ -69,6 +69,22 @@ function parseRelatedOsInput(relatedOsRaw) {
   return { relatedOs: numericRelatedOs };
 }
 
+function parseBooleanInput(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+
+  if (value === true || value === 'true' || value === '1') {
+    return true;
+  }
+
+  if (value === false || value === 'false' || value === '0') {
+    return false;
+  }
+
+  return defaultValue;
+}
+
 function validateItems(items, allowPartial = false) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'Adicione ao menos um item na Solicitação.';
@@ -200,6 +216,7 @@ async function createOrderHandler(request, response, next) {
     const buyerId = Number(request.body?.buyerId ?? 0) || null;
     const urgency = String(request.body?.urgency ?? 'normal').trim();
     const relatedOsRaw = String(request.body?.relatedOs ?? '').trim();
+    const orcamento = parseBooleanInput(request.body?.orcamento, false);
     const items = parseItemsInput(request.body?.items);
     const mediaUploads = mapItemMediaUploads(uploadedFiles, items.length);
     const mediaSizeError = validateUploadedMediaSizes(uploadedFiles);
@@ -279,6 +296,7 @@ async function createOrderHandler(request, response, next) {
       buyerId,
       urgency,
       relatedOs: relatedOsResult.relatedOs,
+      orcamento,
       items: normalizedItems
     });
 

@@ -103,6 +103,7 @@ select option {
   from {
     transform: scaleX(1);
   }
+
   to {
     transform: scaleX(0);
   }
@@ -130,6 +131,7 @@ select option {
     opacity: 0;
     transform: translateX(400px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -679,8 +681,20 @@ input[readonly] {
 }
 
 .form-grid--request-line {
-  grid-template-columns: minmax(300px, 1.5fr) 180px 180px 140px;
+  grid-template-columns: minmax(300px, 1.5fr) 180px 180px 140px 140px;
   align-items: end;
+}
+
+.checkbox-field--request-budget {
+  grid-column: 5;
+  justify-self: start;
+  width: fit-content;
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
+
+.checkbox-field--order-flag {
+  justify-self: start;
 }
 
 .checkbox-field--request-os {
@@ -700,7 +714,7 @@ input[readonly] {
   align-items: end;
 }
 
-.item-card .form-grid + .form-grid {
+.item-card .form-grid+.form-grid {
   margin-top: 8px;
 }
 
@@ -903,15 +917,7 @@ input[readonly] {
 .order-row {
   display: grid;
   grid-template-columns:
-    60px
-    minmax(130px, 0.9fr)
-    minmax(130px, 0.9fr)
-    minmax(140px, 1fr)
-    minmax(150px, 1.1fr)
-    minmax(60px, 0.4fr)
-    minmax(85px, 0.6fr)
-    minmax(85px, 0.6fr)
-    minmax(90px, 0.7fr);
+    60px minmax(130px, 0.9fr) minmax(130px, 0.9fr) minmax(140px, 1fr) minmax(150px, 1.1fr) minmax(60px, 0.4fr) minmax(85px, 0.6fr) minmax(85px, 0.6fr) minmax(90px, 0.7fr);
   gap: 12px;
   align-items: center;
   width: auto;
@@ -956,7 +962,7 @@ input[readonly] {
   border-radius: 16px;
 }
 
-.order-item-row > * {
+.order-item-row>* {
   min-width: 0;
 }
 
@@ -1003,6 +1009,7 @@ input[readonly] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -1032,15 +1039,7 @@ input[readonly] {
   .orders-table__head,
   .order-row {
     grid-template-columns:
-      50px
-      minmax(100px, 0.7fr)
-      minmax(100px, 0.7fr)
-      minmax(110px, 0.8fr)
-      minmax(120px, 0.9fr)
-      minmax(50px, 0.35fr)
-      minmax(70px, 0.5fr)
-      minmax(70px, 0.5fr)
-      minmax(75px, 0.55fr);
+      50px minmax(100px, 0.7fr) minmax(100px, 0.7fr) minmax(110px, 0.8fr) minmax(120px, 0.9fr) minmax(50px, 0.35fr) minmax(70px, 0.5fr) minmax(70px, 0.5fr) minmax(75px, 0.55fr);
     width: auto;
     min-width: 100%;
   }
@@ -1069,6 +1068,7 @@ input[readonly] {
 }
 
 @media (max-width: 1024px) {
+
   .site-header__inner,
   .site-header__actions,
   .tabbar {
@@ -1090,6 +1090,7 @@ input[readonly] {
 }
 
 @media (max-width: 720px) {
+
   .page,
   .site-header {
     width: min(100% - 20px, 1280px);

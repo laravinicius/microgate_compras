@@ -51,6 +51,7 @@ function normalizeOrder(row) {
     urgency: row.urgency,
     relatedOs: row.related_os,
     withoutOs: row.without_os,
+    orcamento: Boolean(row.orcamento),
     compraParaguai: Boolean(row.compra_paraguai),
     status: normalizeOrderStatus(row.status),
     estimatedDelivery: row.estimated_delivery,
@@ -183,6 +184,7 @@ async function listOrders(filters = {}) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.orcamento,
         o.compra_paraguai,
         o.status,
         o.estimated_delivery,
@@ -208,6 +210,7 @@ async function listOrders(filters = {}) {
         o.urgency,
         o.related_os,
         o.without_os,
+        o.orcamento,
         o.compra_paraguai,
         o.status,
         o.estimated_delivery,
@@ -339,6 +342,7 @@ async function createOrder({
   requestName,
   urgency,
   relatedOs,
+  orcamento,
   items
 }) {
   const client = await pool.connect();
@@ -358,11 +362,12 @@ async function createOrder({
           urgency,
           related_os,
           without_os,
+          orcamento,
           compra_paraguai,
           status,
           total
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
         RETURNING
           id,
           user_id,
@@ -371,6 +376,7 @@ async function createOrder({
           urgency,
           related_os,
           without_os,
+          orcamento,
           compra_paraguai,
           status,
           estimated_delivery,
@@ -386,6 +392,7 @@ async function createOrder({
         urgency,
         relatedOs,
         relatedOs === null || relatedOs === undefined,
+        Boolean(orcamento),
         hasCompraParaguai,
         total
       ]
