@@ -357,6 +357,19 @@ select option {
   align-items: center;
 }
 
+.order-actions-header {
+  align-items: flex-start;
+}
+
+.order-actions-header__content {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.order-actions-header__content .page-title {
+  overflow-wrap: anywhere;
+}
+
 .site-header__actions,
 .topbar__right {
   gap: 14px;
@@ -828,7 +841,14 @@ input[readonly] {
 .order-actions-sidebar--header {
   justify-content: flex-end;
   align-self: flex-start;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   max-width: 520px;
+}
+
+.order-actions-sidebar--header .order-actions-nav-button {
+  white-space: nowrap;
 }
 
 .order-actions-content {

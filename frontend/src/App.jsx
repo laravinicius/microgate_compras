@@ -2271,8 +2271,8 @@ function App() {
             <article className="panel">
               {selectedOrder ? (
                 <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
-                  <div className="section-header section-header--page">
-                    <div>
+                  <div className="section-header section-header--page order-actions-header">
+                    <div className="order-actions-header__content">
                       <p className="eyebrow">Pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
@@ -2475,8 +2475,8 @@ function App() {
             <article className="panel">
               {selectedOrder ? (
                 <form className="order-actions" onSubmit={handleSaveSelectedOrder}>
-                  <div className="section-header section-header--page">
-                    <div>
+                  <div className="section-header section-header--page order-actions-header">
+                    <div className="order-actions-header__content">
                       <p className="eyebrow">Histórico do pedido #{selectedOrder.id}</p>
                       <h1 className="page-title">{selectedOrder.requestName}</h1>
                       <p className="description">
