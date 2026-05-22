@@ -14,6 +14,7 @@ import fs from 'fs/promises';
 const allowedStatuses = [
   'pendente',
   'em_orcamento',
+  'orcamento_aprovado',
   'aguardando_aprovacao_do_cliente',
   'comprado/aguardando entrega',
   'comprado',
@@ -25,6 +26,10 @@ const allowedStatuses = [
 function normalizeStatus(status) {
   if (status === 'em_orcamento' || status === 'em orcamento' || status === 'em orçamento' || status === 'em-orcamento') {
     return 'em_orcamento';
+  }
+
+  if (status === 'orcamento_aprovado' || status === 'orcamento aprovado' || status === 'orçamento_aprovado' || status === 'orçamento aprovado' || status === 'orcamento-aprovado') {
+    return 'orcamento_aprovado';
   }
 
   if (status === 'aguardando aprovacao do cliente' || status === 'aguardando aprovação do cliente' || status === 'aguardando_aprovacao_do_cliente' || status === 'aguardando_aprovacao') {

@@ -9,6 +9,7 @@ const orderStatuses = [
   'pendente',
   'em_orcamento',
   'aguardando_aprovacao_do_cliente',
+  'orcamento_aprovado',
   mergedPurchasedStatus,
   finalizedStatus,
   'cancelado'
@@ -37,6 +38,7 @@ const orderStatusLabels = {
   finalizado: 'Finalizado',
   cancelado: 'Cancelado',
   em_orcamento: 'Em orçamento',
+  orcamento_aprovado: 'Orçamento aprovado',
   aguardando_aprovacao_do_cliente: 'Aguardando aprovação do cliente'
 };
 

@@ -4,6 +4,7 @@ import { sendBuyerNotification } from '../utils/email.js';
 const statusAliases = {
   pendente: ['pendente', 'pending'],
   em_orcamento: ['em_orcamento', 'em orcamento', 'em orçamento', 'em-orcamento', 'em_orçamento'],
+  orcamento_aprovado: ['orcamento_aprovado', 'orcamento aprovado', 'orçamento_aprovado', 'orçamento aprovado', 'orcamento-aprovado'],
   'comprado/aguardando entrega': [
     'comprado/aguardando entrega',
     'comprado',
@@ -41,6 +42,10 @@ const statusCanonicalMap = {
   aguardando_aprovacao_do_cliente: 'aguardando_aprovacao_do_cliente',
   'aguardando aprovacao do cliente': 'aguardando_aprovacao_do_cliente',
   'aguardando aprovação do cliente': 'aguardando_aprovacao_do_cliente',
+  orcamento_aprovado: 'orcamento_aprovado',
+  'orcamento aprovado': 'orcamento_aprovado',
+  'orçamento_aprovado': 'orcamento_aprovado',
+  'orçamento aprovado': 'orcamento_aprovado',
   email_pending: 'email_pending',
   'pendente email': 'email_pending'
 };
