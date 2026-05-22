@@ -121,6 +121,7 @@ const isFinishedStatus = (status) =>
   status === 'cancelado' ||
   status === 'cancelled';
 const isPendingStatus = (status) => status === 'pendente' || status === 'pending';
+const isBudgetOnlyStatus = (status) => budgetOnlyOrderStatuses.has(normalizeOrderStatus(status));
 
 function formatCurrencyValue(value) {
   const numericValue = Number(value);
