@@ -648,7 +648,6 @@ function OrderDetailContent({
                   }
                   disabled={!selectedOrderCanEdit}
                 />
-                <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
                 <input
                   type="number"
                   min="0"
