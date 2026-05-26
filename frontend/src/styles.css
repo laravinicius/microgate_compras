@@ -953,6 +953,8 @@ input[readonly] {
 .order-item-row {
   display: grid;
   grid-template-columns: 1.05fr 0.8fr 0.36fr 1fr 0.76fr 0.9fr 0.7fr 0.78fr 0.8fr 1fr;
+  /* Added extra column for frete */
+  grid-template-columns: 1.05fr 0.8fr 0.36fr 1fr 0.76fr 0.9fr 0.7fr 0.78fr 0.8fr 0.6fr 1fr;
   gap: 8px;
   align-items: center;
 }

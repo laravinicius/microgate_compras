@@ -16,7 +16,9 @@ const frontendUrls = (
 const trustProxyRaw = process.env.TRUST_PROXY;
 const trustProxy =
   trustProxyRaw == null
-    ? false
+    ? nodeEnv === 'development'
+      ? false
+      : 1
     : trustProxyRaw === 'true'
       ? true
       : trustProxyRaw === 'false'

@@ -17,4 +17,11 @@ async function checkDatabaseConnection() {
   return result.rows[0];
 }
 
-export { checkDatabaseConnection, pool, query };
+async function ensureOrderItemsFreteColumn() {
+  await query(`
+    ALTER TABLE order_items
+    ADD COLUMN IF NOT EXISTS frete NUMERIC(12,2) NOT NULL DEFAULT 0
+  `);
+}
+
+export { checkDatabaseConnection, ensureOrderItemsFreteColumn, pool, query };

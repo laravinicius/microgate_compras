@@ -104,6 +104,7 @@ function normalizeOrderItem(row) {
     productValue: Number(row.product_value),
     saleValue: Number(row.sale_value),
     passedValue: Number(row.passed_value),
+    frete: row.frete === null ? 0 : Number(row.frete),
     imageKey: row.image_key ?? null,
     imageMimeType: row.image_mime_type ?? null,
     imageSizeBytes: row.image_size_bytes === null ? null : Number(row.image_size_bytes),
@@ -305,6 +306,7 @@ async function getOrderById(orderId) {
         product_value,
         sale_value,
         passed_value,
+        frete,
         image_key,
         image_mime_type,
         image_size_bytes,
@@ -445,6 +447,7 @@ async function createOrder({
             product_value,
             sale_value,
             passed_value,
+            frete,
             image_key,
             image_mime_type,
             image_size_bytes,
@@ -452,7 +455,7 @@ async function createOrder({
             video_mime_type,
             video_size_bytes
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         `,
         [
           order.id,
@@ -465,6 +468,7 @@ async function createOrder({
           item.productValue,
           item.saleValue,
           item.passedValue,
+          item.frete || 0,
           item.imageKey,
           item.imageMimeType,
           item.imageSizeBytes,
@@ -632,7 +636,8 @@ async function updateOrder(
             product_value = $4,
             sale_value = $5,
             passed_value = $6,
-            compra_paraguai = $7
+            frete = $7,
+            compra_paraguai = $8
           WHERE id = $1
         `,
         [
@@ -642,6 +647,7 @@ async function updateOrder(
           item.productValue,
           item.saleValue,
           item.passedValue,
+          item.frete || 0,
           Boolean(item.compraParaguai)
         ]
       );
@@ -699,6 +705,12 @@ async function updateOrder(
       if (Number(previousItem.passedValue) !== Number(item.passedValue)) {
         historyEntries.push(
           `Item "${previousItem.productName}": valor repassado alterado para ${item.passedValue.toFixed(2)}.`
+        );
+      }
+
+      if (Number(previousItem.frete || 0) !== Number(item.frete || 0)) {
+        historyEntries.push(
+          `Item "${previousItem.productName}": frete alterado para ${Number(item.frete || 0).toFixed(2)}.`
         );
       }
 

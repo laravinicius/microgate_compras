@@ -119,6 +119,7 @@ function validateItems(items, allowPartial = false) {
 
     const productValue = Number(item.productValue);
     const passedValue = Number(item.passedValue ?? 0);
+    const frete = Number(item.frete ?? 0);
     const compraParaguai = item.compraParaguai;
 
     if (!Number.isFinite(productValue) || productValue < 0) {
@@ -127,6 +128,10 @@ function validateItems(items, allowPartial = false) {
 
     if (!Number.isFinite(passedValue) || passedValue < 0) {
       return 'O valor repassado deve ser um numero valido.';
+    }
+
+    if (!Number.isFinite(frete) || frete < 0) {
+      return 'O valor do frete deve ser um numero valido.';
     }
 
     if (compraParaguai !== undefined && typeof compraParaguai !== 'boolean') {
@@ -282,7 +287,11 @@ async function createOrderHandler(request, response, next) {
     const normalizedItems = items.map((item, itemIndex) => {
       const productValue = toCurrencyNumber(item.productValue);
       const compraParaguai = Boolean(item.compraParaguai);
-      const saleValue = calculateSaleValue(productValue, compraParaguai);
+      const saleValueBase = calculateSaleValue(productValue, compraParaguai);
+      const quantity = Number(item.quantity || 1) || 1;
+      const frete = toCurrencyNumber(item.frete || 0);
+      const perUnitFrete = frete / quantity;
+      const saleValue = toCurrencyNumber(Number(saleValueBase) + Number(perUnitFrete));
       const itemMedia = mediaUploads.get(itemIndex) || {};
 
       return {
@@ -295,6 +304,7 @@ async function createOrderHandler(request, response, next) {
         productValue,
         saleValue,
         passedValue: toCurrencyNumber(saleValue * Number(item.quantity)),
+        frete: toCurrencyNumber(item.frete || 0),
         imageKey: itemMedia.image?.filename ?? null,
         imageMimeType: itemMedia.image?.mimetype ?? null,
         imageSizeBytes: Number(itemMedia.image?.size ?? 0) || null,
@@ -484,14 +494,24 @@ async function updateOrderHandler(request, response, next) {
       const productValue = toCurrencyNumber(item.productValue);
       const compraParaguai = Boolean(item.compraParaguai);
 
+      const quantity = Number(item.quantity || 1) || 1;
+      const frete = toCurrencyNumber(item.frete || 0);
+      const saleValueProvided = Number(item.saleValue);
+      const saleValueBase = calculateSaleValue(productValue, compraParaguai);
+      const saleValue = Number.isFinite(saleValueProvided) && saleValueProvided > 0
+        ? saleValueProvided
+        : toCurrencyNumber(saleValueBase + frete / quantity);
+
       return {
         id: Number(item.id),
         productCode: String(item.productCode ?? '').trim(),
         productLink: String(item.productLink ?? '').trim(),
         compraParaguai,
         productValue,
-        saleValue: calculateSaleValue(productValue, compraParaguai),
-        passedValue: toCurrencyNumber(item.passedValue)
+        saleValue,
+        passedValue: toCurrencyNumber(item.passedValue),
+        frete: frete,
+        quantity
       };
     });
 

@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
   sale_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
   passed_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  frete NUMERIC(12, 2) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -144,6 +145,9 @@ ADD COLUMN IF NOT EXISTS video_size_bytes INTEGER;
 
 ALTER TABLE order_items
 ADD COLUMN IF NOT EXISTS product_code VARCHAR(120);
+
+ALTER TABLE order_items
+ADD COLUMN IF NOT EXISTS frete NUMERIC(12,2) NOT NULL DEFAULT 0;
 
 UPDATE order_items
 SET passed_value = sale_value * quantity

@@ -200,7 +200,8 @@ function buildCreateOrderFormData(form) {
     notes: item.notes,
     compraParaguai: Boolean(item.compraParaguai),
     quantity: Number(item.quantity),
-    productValue: Number(item.productValue || 0)
+    productValue: Number(item.productValue || 0),
+    frete: Number(item.frete || 0)
   }));
 
   formData.append('items', JSON.stringify(serializedItems));
@@ -569,6 +570,7 @@ function OrderDetailContent({
             <span>Detalhes</span>
             <span>Compra PY</span>
             <span>Valor do produto</span>
+            <span>Frete</span>
             <span>Valor da venda</span>
             <span>Valor repassado</span>
           </div>
@@ -643,6 +645,17 @@ function OrderDetailContent({
                   value={item.productValue}
                   onChange={(event) =>
                     updateSelectedOrderItem(item.id, 'productValue', event.target.value)
+                  }
+                  disabled={!selectedOrderCanEdit}
+                />
+                <input type="text" value={formatCurrencyValue(item.saleValue)} readOnly />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.frete || 0}
+                  onChange={(event) =>
+                    updateSelectedOrderItem(item.id, 'frete', event.target.value)
                   }
                   disabled={!selectedOrderCanEdit}
                 />
@@ -1090,15 +1103,23 @@ function App() {
           [field]: value
         };
 
-        if (field === 'productValue' || field === 'compraParaguai') {
-          updatedItem.saleValue = calculateSaleValue(
+        if (
+          field === 'productValue' ||
+          field === 'compraParaguai' ||
+          field === 'frete' ||
+          field === 'quantity'
+        ) {
+          const baseSale = calculateSaleValue(
             Number(updatedItem.productValue || 0),
             Boolean(updatedItem.compraParaguai)
           );
+          const quantity = Number(updatedItem.quantity || 1) || 1;
+          const frete = Number(updatedItem.frete || 0) || 0;
+          const perUnitFrete = frete / quantity;
+          const saleWithFrete = Number(formatCurrencyValue(Number(baseSale) + Number(perUnitFrete)));
+          updatedItem.saleValue = saleWithFrete;
           updatedItem.passedValue = Number(
-            formatCurrencyValue(
-              Number(updatedItem.saleValue || 0) * Number(updatedItem.quantity || 0)
-            )
+            formatCurrencyValue(Number(updatedItem.saleValue || 0) * Number(quantity))
           );
         }
 
@@ -1220,13 +1241,21 @@ function App() {
           [field]: value
         };
 
-        if (field === 'productValue' || field === 'compraParaguai') {
-          updatedItem.saleValue = formatCurrencyValue(
-            calculateSaleValue(
-              Number(updatedItem.productValue || 0),
-              Boolean(updatedItem.compraParaguai)
-            )
+        if (
+          field === 'productValue' ||
+          field === 'compraParaguai' ||
+          field === 'frete' ||
+          field === 'quantity'
+        ) {
+          const baseSale = calculateSaleValue(
+            Number(updatedItem.productValue || 0),
+            Boolean(updatedItem.compraParaguai)
           );
+          const quantity = Number(updatedItem.quantity || 1) || 1;
+          const frete = Number(updatedItem.frete || 0) || 0;
+          const perUnitFrete = frete / quantity;
+          const saleWithFrete = Number(formatCurrencyValue(Number(baseSale) + Number(perUnitFrete)));
+          updatedItem.saleValue = formatCurrencyValue(saleWithFrete);
         }
 
         if (field === 'quantity') {
@@ -1622,6 +1651,9 @@ function App() {
             productLink: item.productLink,
             compraParaguai: Boolean(item.compraParaguai),
             productValue: Number(item.productValue || 0),
+            quantity: Number(item.quantity || 1),
+            frete: Number(item.frete || 0),
+            saleValue: Number(item.saleValue || 0),
             passedValue: Number(item.passedValue || 0)
           }))
         })
@@ -2236,6 +2268,18 @@ function App() {
                             onChange={(event) =>
                               updateRequestItem(index, 'productValue', event.target.value)
                             }
+                            placeholder="0.00"
+                          />
+                        </label>
+
+                        <label>
+                          <span>Frete</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.frete || 0}
+                            onChange={(event) => updateRequestItem(index, 'frete', event.target.value)}
                             placeholder="0.00"
                           />
                         </label>
