@@ -60,11 +60,11 @@ function getBaseSaleMultiplier(productValue) {
   return Number(productValue) < 1000 ? 1.7 : 1.6;
 }
 
-function calculateSaleValue(productValue, compraParaguai = false) {
+function calculateSaleValue(productValue, frete = 0, compraParaguai = false) {
   const baseMultiplier = getBaseSaleMultiplier(productValue);
   const finalMultiplier = compraParaguai ? baseMultiplier * 1.25 : baseMultiplier;
 
-  return toCurrencyNumber(Number(productValue) * finalMultiplier);
+  return toCurrencyNumber((Number(productValue) + Number(frete)) * finalMultiplier);
 }
 
 function parseRelatedOsInput(relatedOsRaw) {
@@ -287,11 +287,10 @@ async function createOrderHandler(request, response, next) {
     const normalizedItems = items.map((item, itemIndex) => {
       const productValue = toCurrencyNumber(item.productValue);
       const compraParaguai = Boolean(item.compraParaguai);
-      const saleValueBase = calculateSaleValue(productValue, compraParaguai);
       const quantity = Number(item.quantity || 1) || 1;
       const frete = toCurrencyNumber(item.frete || 0);
       const perUnitFrete = frete / quantity;
-      const saleValue = toCurrencyNumber(Number(saleValueBase) + Number(perUnitFrete));
+      const saleValue = calculateSaleValue(productValue, perUnitFrete, compraParaguai);
       const itemMedia = mediaUploads.get(itemIndex) || {};
 
       return {
@@ -497,10 +496,10 @@ async function updateOrderHandler(request, response, next) {
       const quantity = Number(item.quantity || 1) || 1;
       const frete = toCurrencyNumber(item.frete || 0);
       const saleValueProvided = Number(item.saleValue);
-      const saleValueBase = calculateSaleValue(productValue, compraParaguai);
+      const perUnitFrete = frete / quantity;
       const saleValue = Number.isFinite(saleValueProvided) && saleValueProvided > 0
         ? saleValueProvided
-        : toCurrencyNumber(saleValueBase + frete / quantity);
+        : calculateSaleValue(productValue, perUnitFrete, compraParaguai);
 
       return {
         id: Number(item.id),

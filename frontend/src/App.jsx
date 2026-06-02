@@ -137,17 +137,18 @@ function getBaseSaleMultiplier(productValue) {
   return Number(productValue) < 1000 ? 1.7 : 1.6;
 }
 
-function calculateSaleValue(productValue, compraParaguai = false) {
+function calculateSaleValue(productValue, frete = 0, compraParaguai = false) {
   const normalizedProductValue = Number(productValue);
+  const normalizedFrete = Number(frete);
 
-  if (!Number.isFinite(normalizedProductValue)) {
+  if (!Number.isFinite(normalizedProductValue) || !Number.isFinite(normalizedFrete)) {
     return 0;
   }
 
   const baseMultiplier = getBaseSaleMultiplier(normalizedProductValue);
   const finalMultiplier = compraParaguai ? baseMultiplier * 1.25 : baseMultiplier;
 
-  return Number(formatCurrencyValue(normalizedProductValue * finalMultiplier));
+  return Number(formatCurrencyValue((normalizedProductValue + normalizedFrete) * finalMultiplier));
 }
 
 function formatDateTime(value) {
@@ -1108,14 +1109,14 @@ function App() {
           field === 'frete' ||
           field === 'quantity'
         ) {
-          const baseSale = calculateSaleValue(
-            Number(updatedItem.productValue || 0),
-            Boolean(updatedItem.compraParaguai)
-          );
           const quantity = Number(updatedItem.quantity || 1) || 1;
           const frete = Number(updatedItem.frete || 0) || 0;
           const perUnitFrete = frete / quantity;
-          const saleWithFrete = Number(formatCurrencyValue(Number(baseSale) + Number(perUnitFrete)));
+          const saleWithFrete = calculateSaleValue(
+            Number(updatedItem.productValue || 0),
+            perUnitFrete,
+            Boolean(updatedItem.compraParaguai)
+          );
           updatedItem.saleValue = saleWithFrete;
           updatedItem.passedValue = Number(
             formatCurrencyValue(Number(updatedItem.saleValue || 0) * Number(quantity))
@@ -1246,14 +1247,14 @@ function App() {
           field === 'frete' ||
           field === 'quantity'
         ) {
-          const baseSale = calculateSaleValue(
-            Number(updatedItem.productValue || 0),
-            Boolean(updatedItem.compraParaguai)
-          );
           const quantity = Number(updatedItem.quantity || 1) || 1;
           const frete = Number(updatedItem.frete || 0) || 0;
           const perUnitFrete = frete / quantity;
-          const saleWithFrete = Number(formatCurrencyValue(Number(baseSale) + Number(perUnitFrete)));
+          const saleWithFrete = calculateSaleValue(
+            Number(updatedItem.productValue || 0),
+            perUnitFrete,
+            Boolean(updatedItem.compraParaguai)
+          );
           updatedItem.saleValue = formatCurrencyValue(saleWithFrete);
         }
 
