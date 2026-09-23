@@ -9,53 +9,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS username VARCHAR(80);
-
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS password_hash TEXT;
-
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS password_change_required BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'solicitante';
-
-UPDATE users
-SET role = 'administrador'
-WHERE role = 'admin';
-
-UPDATE users
-SET role = 'solicitante'
-WHERE role = 'user';
-
-UPDATE users
-SET username = 'admin'
-WHERE name = 'Administrador HML'
-  AND (username IS NULL OR username = '');
-
-UPDATE users
-SET username = CONCAT('user_', id)
-WHERE username IS NULL OR username = '';
-
-ALTER TABLE users
-ALTER COLUMN username SET NOT NULL;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'users_username_key'
-  ) THEN
-    ALTER TABLE users
-    ADD CONSTRAINT users_username_key UNIQUE (username);
-  END IF;
-END $$;
-
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE;
-
 CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users (id),
@@ -65,6 +18,7 @@ CREATE TABLE IF NOT EXISTS orders (
   related_os INTEGER,
   without_os BOOLEAN NOT NULL DEFAULT FALSE,
   orcamento BOOLEAN NOT NULL DEFAULT FALSE,
+  compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   estimated_delivery DATE,
   comments TEXT,
@@ -72,36 +26,6 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS request_name VARCHAR(180);
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) NOT NULL DEFAULT 'normal';
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS related_os INTEGER;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS without_os BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS orcamento BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS estimated_delivery DATE;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS comments TEXT;
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS buyer_id INTEGER REFERENCES users (id);
-
-ALTER TABLE orders
-ADD COLUMN IF NOT EXISTS compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS order_items (
   id SERIAL PRIMARY KEY,
@@ -116,42 +40,14 @@ CREATE TABLE IF NOT EXISTS order_items (
   sale_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
   passed_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
   frete NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  image_key VARCHAR(255),
+  image_mime_type VARCHAR(80),
+  image_size_bytes INTEGER,
+  video_key VARCHAR(255),
+  video_mime_type VARCHAR(80),
+  video_size_bytes INTEGER,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS passed_value NUMERIC(12, 2) NOT NULL DEFAULT 0;
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS compra_paraguai BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS image_key VARCHAR(255);
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS image_mime_type VARCHAR(80);
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS video_key VARCHAR(255);
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS video_mime_type VARCHAR(80);
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS video_size_bytes INTEGER;
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS product_code VARCHAR(120);
-
-ALTER TABLE order_items
-ADD COLUMN IF NOT EXISTS frete NUMERIC(12,2) NOT NULL DEFAULT 0;
-
-UPDATE order_items
-SET passed_value = sale_value * quantity
-WHERE passed_value = 0;
 
 CREATE TABLE IF NOT EXISTS order_history (
   id SERIAL PRIMARY KEY,
