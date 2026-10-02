@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import microgateLogo from './assets/microgate2.png';
+import microgateLogo from './assets/logo_horizontal_white.webp';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const tokenStorageKey = 'compras-auth-token';
